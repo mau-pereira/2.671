@@ -4,7 +4,7 @@ import time
 import matplotlib.pyplot as plt
 
 ### CONFIG ###
-TARGET_TAG_ID = 0
+TARGET_TAG_ID = 4
 SAMPLE_RATE = 50              # Hz
 DURATION = 15                 # seconds
 
@@ -14,8 +14,8 @@ DT = 1.0 / SAMPLE_RATE
 ### CAMERA SETUP (same as tracker.py) ###
 cam = cv2.VideoCapture(1)
 cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
-cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
-cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 width = cam.get(cv2.CAP_PROP_FRAME_WIDTH)
 height = cam.get(cv2.CAP_PROP_FRAME_HEIGHT)
 print(f"Resolution: {width:.0f}x{height:.0f}")
@@ -24,7 +24,7 @@ print(f"Resolution: {width:.0f}x{height:.0f}")
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_6X6_250)
 aruco_parameters = cv2.aruco.DetectorParameters()
 detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_parameters)
-tag_size = 0.075
+tag_size = 0.2
 
 ### CALIBRATION SETUP (same as tracker.py) ###
 fname = 'calibration_chessboard_4k_tank.yaml'
