@@ -1,0 +1,14 @@
+%YAML:1.0
+---
+rvec_world_to_cam: !!opencv-matrix
+   rows: 3
+   cols: 1
+   dt: d
+   data: [ 2.2084404867265572, -0.011980935391426993,
+       -0.035020096795163519 ]
+tvec_world_to_cam: !!opencv-matrix
+   rows: 3
+   cols: 1
+   dt: d
+   data: [ -2.0165094760776285, -1.4596404100239706, 4.5922648225561646 ]
+extrinsics_reprojection_rmse_px: 8.4583749771118164

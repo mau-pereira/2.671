@@ -39,7 +39,7 @@ DEFAULT_MARKER_SIZE_M = 0.2
 EXTRINSICS_POOL_MARKER_COUNT = 4
 
 # If True, uses EXTRINSICS_PRESET_MARKERS_INCHES (no typing). If False, prompts.
-USE_EXTRINSICS_MARKER_PRESET = False
+USE_EXTRINSICS_MARKER_PRESET = True
 # Each row: (aruco_id, x_in, y_in, z_in) inches, flat pool plane (z=0).
 EXTRINSICS_PRESET_MARKERS_INCHES = (
     (0, 160.0, -60.0, 0.0),
