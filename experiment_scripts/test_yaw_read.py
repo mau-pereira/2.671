@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
-Read one ArUco marker trajectory in world coordinates using saved calibration.
+Read one ArUco marker yaw trajectory in world coordinates using saved calibration.
+Uses corner ray-plane projection (fast) instead of estimatePoseSingleMarkers.
 """
 
 import os
@@ -31,8 +32,8 @@ EXTRINSICS_PATH = os.path.join(
 CAMERA_INDEX = 1
 ARUCO_DICT = cv2.aruco.DICT_6X6_250
 TARGET_TAG_ID = 0
-SAMPLE_HZ = 45
-DURATION_S = 3
+DURATION_S = 30
+SHOW_CAMERA_FEED = True
 
 FRAME_WIDTH = 1920
 FRAME_HEIGHT = 1080
@@ -88,12 +89,12 @@ def pixel_to_world_plane_fast(
     return cam_origin_world + t_param * ray_world
 
 
-def create_trajectory_tracker(
+def create_yaw_tracker(
     intrinsics_path: str = INTRINSICS_PATH,
     extrinsics_path: str = EXTRINSICS_PATH,
     aruco_dict_id: int = ARUCO_DICT,
 ):
-    """Create reusable trajectory-tracker resources for external scripts."""
+    """Create reusable yaw-tracker resources for external scripts."""
     k, d = load_intrinsics(intrinsics_path)
     rvec_w2c, tvec_w2c = load_extrinsics(extrinsics_path)
     r_wc, _ = cv2.Rodrigues(rvec_w2c)
@@ -112,7 +113,7 @@ def create_trajectory_tracker(
     }
 
 
-def get_marker_xy_world_from_frame(
+def get_marker_yaw_world_from_frame(
     image: np.ndarray,
     detector: cv2.aruco.ArucoDetector,
     target_tag_id: int,
@@ -123,7 +124,7 @@ def get_marker_xy_world_from_frame(
     world_plane_z: float = WORLD_PLANE_Z,
 ):
     """
-    Return world-plane (x, y) for the marker center in one camera frame.
+    Return marker yaw (rad) in world frame from one camera frame.
     Returns None when the target marker is not detected.
     """
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -137,15 +138,32 @@ def get_marker_xy_world_from_frame(
         return None
 
     i = int(hit[0])
-    crn = corners[i].reshape(4, 2)
-    cx = float(np.mean(crn[:, 0]))
-    cy = float(np.mean(crn[:, 1]))
-    pw = pixel_to_world_plane_fast(cx, cy, k, d, r_cw, cam_origin_world, world_plane_z)
+    crn = corners[i].reshape(4, 2)  # TL, TR, BR, BL
 
-    if not np.isfinite(pw[0]) or not np.isfinite(pw[1]):
+    p_tl = pixel_to_world_plane_fast(
+        float(crn[0, 0]),
+        float(crn[0, 1]),
+        k,
+        d,
+        r_cw,
+        cam_origin_world,
+        world_plane_z,
+    )
+    p_tr = pixel_to_world_plane_fast(
+        float(crn[1, 0]),
+        float(crn[1, 1]),
+        k,
+        d,
+        r_cw,
+        cam_origin_world,
+        world_plane_z,
+    )
+
+    if not (np.isfinite(p_tl[0]) and np.isfinite(p_tl[1]) and np.isfinite(p_tr[0]) and np.isfinite(p_tr[1])):
         return None
 
-    return float(pw[0]), float(pw[1])
+    yaw_rad = np.arctan2(p_tr[1] - p_tl[1], p_tr[0] - p_tl[0])
+    return float(yaw_rad)
 
 
 def main():
@@ -158,7 +176,11 @@ def main():
     camo_open = input("Is Camo Studio open? [Y/n]: ").strip().lower()
     if camo_open in {"n", "no"}:
         print("Warning: detections/Hz are worse if Camo Studio is not open.")
-    print(f"Tracking ArUco id {TARGET_TAG_ID} for {DURATION_S} s (max-throughput mode).")
+    print(f"Tracking ArUco id {TARGET_TAG_ID} yaw for {DURATION_S} s (max-throughput mode).")
+    if SHOW_CAMERA_FEED:
+        print("Live camera preview enabled (press 'q' to stop early).")
+    else:
+        print("Live camera preview disabled.")
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(ARUCO_DICT)
     detector = cv2.aruco.ArucoDetector(aruco_dict, cv2.aruco.DetectorParameters())
@@ -179,8 +201,12 @@ def main():
     cam.set(cv2.CAP_PROP_EXPOSURE, MANUAL_EXPOSURE)
     cam.set(cv2.CAP_PROP_GAIN, MANUAL_GAIN)
 
+    if SHOW_CAMERA_FEED:
+        cv2.namedWindow("YawReadLive", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("YawReadLive", 1280, 720)
+
     vision_t = []
-    vision_x = []
+    vision_yaw_rad = []
 
     t0 = time.perf_counter()
     while True:
@@ -195,53 +221,125 @@ def main():
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         corners, ids, _ = detector.detectMarkers(gray)
 
+        yaw_deg_live = None
         if ids is not None:
             ids_flat = ids.flatten()
             hit = np.where(ids_flat == TARGET_TAG_ID)[0]
             if hit.size > 0:
                 i = int(hit[0])
-                crn = corners[i].reshape(4, 2)
-                cx = float(np.mean(crn[:, 0]))
-                cy = float(np.mean(crn[:, 1]))
+                crn = corners[i].reshape(4, 2)  # TL, TR, BR, BL
 
-                pw = pixel_to_world_plane_fast(
-                    cx,
-                    cy,
+                p_tl = pixel_to_world_plane_fast(
+                    float(crn[0, 0]),
+                    float(crn[0, 1]),
                     k,
                     d,
                     r_cw,
                     cam_origin_world,
                     WORLD_PLANE_Z,
                 )
-                vision_t.append(t_rel)
-                vision_x.append(float(pw[0]))
+                p_tr = pixel_to_world_plane_fast(
+                    float(crn[1, 0]),
+                    float(crn[1, 1]),
+                    k,
+                    d,
+                    r_cw,
+                    cam_origin_world,
+                    WORLD_PLANE_Z,
+                )
+
+                if np.isfinite(p_tl[0]) and np.isfinite(p_tr[0]):
+                    yaw_rad = np.arctan2(p_tr[1] - p_tl[1], p_tr[0] - p_tl[0])
+                    vision_t.append(t_rel)
+                    vision_yaw_rad.append(float(yaw_rad))
+                    yaw_deg_live = float(np.rad2deg(yaw_rad))
+
+        if SHOW_CAMERA_FEED:
+            draw = image.copy()
+            if ids is not None:
+                cv2.aruco.drawDetectedMarkers(draw, corners, ids)
+            status = f"t={t_rel:.2f}s"
+            if yaw_deg_live is None:
+                status += f"  no id {TARGET_TAG_ID}"
+                color = (0, 0, 255)
+            else:
+                status += f"  yaw={yaw_deg_live:.1f} deg"
+                color = (0, 255, 0)
+            cv2.putText(
+                draw,
+                status,
+                (16, 32),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.8,
+                color,
+                2,
+                cv2.LINE_AA,
+            )
+            cv2.imshow("YawReadLive", draw)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord("q"):
+                print("Stopping early due to 'q' key.")
+                break
 
     capture_elapsed_s = time.perf_counter() - t0
     cam.release()
+    if SHOW_CAMERA_FEED:
+        cv2.destroyWindow("YawReadLive")
 
     vision_t = np.asarray(vision_t, dtype=float)
-    vision_x = np.asarray(vision_x, dtype=float)
+    vision_yaw_rad = np.asarray(vision_yaw_rad, dtype=float)
     print(f"Capture loop wall time: {capture_elapsed_s:.3f} s (target {DURATION_S:.3f} s)")
     print(f"Vision detections: {vision_t.size}")
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    if vision_t.size > 0:
-        ax.plot(vision_t, vision_x, "b.", markersize=4, label="x(t)")
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(9, 7), sharex=True)
+    if vision_t.size >= 2:
+        yaw_unwrapped = np.unwrap(vision_yaw_rad)
+        yaw_rate_rad_s = np.gradient(yaw_unwrapped, vision_t)
+        yaw_deg = np.rad2deg(yaw_unwrapped)
+        yaw_rate_deg_s = np.rad2deg(yaw_rate_rad_s)
+
+        ax1.plot(vision_t, yaw_deg, "b.", markersize=4, label="yaw")
+        ax2.plot(vision_t, yaw_rate_deg_s, "m.", markersize=4, label="yaw rate")
+    elif vision_t.size == 1:
+        yaw_deg = np.rad2deg(vision_yaw_rad)
+        ax1.plot(vision_t, yaw_deg, "b.", markersize=4, label="yaw")
+        ax2.text(
+            0.5,
+            0.5,
+            "Need >= 2 samples for yaw rate",
+            transform=ax2.transAxes,
+            ha="center",
+            va="center",
+            color="red",
+        )
     else:
-        ax.text(
+        ax1.text(
             0.5,
             0.5,
-            "No valid x samples detected",
-            transform=ax.transAxes,
+            "No valid yaw samples detected",
+            transform=ax1.transAxes,
+            ha="center",
+            va="center",
+            color="red",
+        )
+        ax2.text(
+            0.5,
+            0.5,
+            "No valid yaw-rate samples detected",
+            transform=ax2.transAxes,
             ha="center",
             va="center",
             color="red",
         )
 
-    ax.set_xlabel("time (s)")
-    ax.set_ylabel("x world (m)")
-    ax.set_title(f"ArUco id {TARGET_TAG_ID}: x vs time")
-    ax.grid(True)
+    ax1.set_ylabel("yaw (deg)")
+    ax1.set_title(f"ArUco id {TARGET_TAG_ID}: world-frame yaw vs time")
+    ax1.grid(True)
+
+    ax2.set_xlabel("time (s)")
+    ax2.set_ylabel("yaw rate (deg/s)")
+    ax2.grid(True)
+
     fig.tight_layout()
     plt.show()
 

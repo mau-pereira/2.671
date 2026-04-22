@@ -12,10 +12,41 @@ import cv2
 # User settings
 # ---------------------------------------------------------------------
 CAMERA_INDEX = 1
-DESIRED_WIDTH = 3840
+DESIRED_WIDTH = 1920
 DESIRED_HEIGHT = 2160
 DESIRED_FPS = 60
 PROBE_SECONDS = 3.0
+
+
+def make_frequency_checker(label: str = "loop", print_every_s: float = 2.0):
+    """
+    Return a callable you can invoke once per loop iteration to print frequency.
+
+    Usage:
+        freq_tick = make_frequency_checker(label="tracker", print_every_s=2.0)
+        while True:
+            ...
+            freq_tick()
+    """
+    if print_every_s <= 0:
+        raise ValueError("print_every_s must be > 0.")
+
+    state = {
+        "t_last_print": time.perf_counter(),
+        "count": 0,
+    }
+
+    def tick():
+        state["count"] += 1
+        now = time.perf_counter()
+        elapsed = now - state["t_last_print"]
+        if elapsed >= print_every_s:
+            hz = state["count"] / max(elapsed, 1e-9)
+            print(f"[FREQ:{label}] {hz:.2f} Hz over {elapsed:.2f} s")
+            state["count"] = 0
+            state["t_last_print"] = now
+
+    return tick
 
 
 def main():
