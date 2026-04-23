@@ -27,12 +27,16 @@ from setup import make_frequency_checker
 ESP32_IP = "192.168.4.1"
 ESP32_PORT = 81
 
-# -- Runtime sampling ----------------------------------------------------------
+# -- Runtime sampling -------------------------------------x---------------------
 RECORD_HZ = 60.0
 SHOW_CAMERA_FEED = False
 SHOW_FREQUENCY_CHECK = False
 RAWDATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rawdata")
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+MANUAL_RIGHT_RUDDER_PWM = 2000
+MANUAL_UP_PROP_PWM = 1650
+
 INTRINSICS_PATH = os.path.join(
     SCRIPT_DIR,
     "calibration",
@@ -218,8 +222,16 @@ def save_recording():
         record_data = []
 
     os.makedirs(RAWDATA_DIR, exist_ok=True)
-    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    fname = os.path.join(RAWDATA_DIR, f"trajectory_capture_{stamp}.csv")
+    index = 1
+    while True:
+        candidate = os.path.join(
+            RAWDATA_DIR,
+            f"prop{MANUAL_UP_PROP_PWM}rudder{MANUAL_RIGHT_RUDDER_PWM}_{index}.csv",
+        )
+        if not os.path.exists(candidate):
+            fname = candidate
+            break
+        index += 1
     np.savetxt(
         fname,
         payload,
@@ -402,13 +414,13 @@ def on_press(key):
         return
 
     if key == keyboard.Key.left:
-        apply_command(current_propeller_pwm, 1200, "MANUAL_LEFT")
+        apply_command(current_propeller_pwm, 1000, "MANUAL_LEFT")
     elif key == keyboard.Key.right:
-        apply_command(current_propeller_pwm, 1800, "MANUAL_RIGHT")
+        apply_command(current_propeller_pwm, MANUAL_RIGHT_RUDDER_PWM, "MANUAL_RIGHT")
     elif key == keyboard.Key.up:
-        apply_command(1675, current_rudder_pwm, "MANUAL_THROTTLE_UP")
+        apply_command(MANUAL_UP_PROP_PWM, current_rudder_pwm, "MANUAL_THROTTLE_UP")
     elif key == keyboard.Key.down:
-        apply_command(1100, current_rudder_pwm, "MANUAL_THROTTLE_DOWN")
+        apply_command(1300, current_rudder_pwm, "MANUAL_THROTTLE_DOWN")
 
 
 def on_release(key):
