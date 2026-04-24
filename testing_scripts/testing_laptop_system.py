@@ -25,8 +25,8 @@ LATCH_PRESETS = {
 ARROW_PRESETS = {
     keyboard.Key.up:    (1600, 1500, "UP"),
     keyboard.Key.down:  (1400, 1500, "DOWN"),
-    keyboard.Key.right: (1600, 1700, "RIGHT"),
-    keyboard.Key.left:  (1600, 1300, "LEFT"),
+    keyboard.Key.right: (1600, 2000, "RIGHT"),
+    keyboard.Key.left:  (1600, 1000, "LEFT"),
 }
 
 IDLE = (1500, 1500, "IDLE")
