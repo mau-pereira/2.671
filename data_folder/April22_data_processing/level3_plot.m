@@ -131,13 +131,25 @@ for j = 1:min(numel(hTheil), size(grayCols, 1))
     set(hTheil(j), 'FaceColor', grayCols(j, :));
 end
 set(gca, 'XTick', 1:4, 'XTickLabel', cats);
-ylabel('Mean Theil Proportion');
+ylabel('Theil MSE Proportion');
 legend({'U^B', 'U^V', 'U^C'}, 'Location', 'eastoutside', 'Interpreter', 'tex');
-title('Theil MSE decomposition');
 ylim([0 1]);
 grid off;
 improvePlot();
+axTheil = gca;
+set(axTheil, 'XTick', 1:4, 'XTickLabel', {'Regime A', 'Regime B', 'Regime A', 'Regime B'});
+yl = ylim(axTheil);
+yTxt = yl(1) - 0.08 * diff(yl);
+axFs = get(axTheil, 'FontSize');
+axFw = get(axTheil, 'FontWeight');
+text(axTheil, 1.5, yTxt, 'Speed', 'HorizontalAlignment', 'center', ...
+    'VerticalAlignment', 'top', 'Interpreter', 'none', 'Clipping', 'off', ...
+    'FontSize', axFs, 'FontWeight', axFw);
+text(axTheil, 3.5, yTxt, 'Yaw', 'HorizontalAlignment', 'center', ...
+    'VerticalAlignment', 'top', 'Interpreter', 'none', 'Clipping', 'off', ...
+    'FontSize', axFs, 'FontWeight', axFw);
 setFigureMaxSquareOnScreen(gcf);
+exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_theil_decomposition_by_regime.png'), exportCfg);
 
 %% Plot 3: Theil U^B, U^C, U^V vs propeller percent — one figure per output × component (regime A/B; rudders pooled)
 theilIdxBcv = [1, 3, 2]; % U^B, U^C, U^V
@@ -352,7 +364,7 @@ for k = 1:numel(series)
         'DisplayName', fitLeg); %#ok<AGROW>
 end
 
-xlabel(ax, 'Propeller command (%)');
+xlabel(ax, 'Propeller Command (%)');
 ylabel(ax, 'Pearson r');
 grid(ax, 'off');
 
@@ -519,7 +531,7 @@ for k = 1:numel(series)
         'DisplayName', fitLeg); %#ok<AGROW>
 end
 
-xlabel(ax, 'Propeller command (%)');
+xlabel(ax, 'Propeller Command (%)');
 ylabel(ax, sprintf('%s Proportion', compTex), 'Interpreter', 'tex');
 grid(ax, 'off');
 
@@ -1073,7 +1085,7 @@ cb = mean([cbA, cbB], 'omitnan');
 yline(cb, 'k--', 'LineWidth', 0.9);
 yline(-cb, 'k--', 'LineWidth', 0.9);
 yline(0, 'k:');
-xlabel('Lag (samples)');
+xlabel('Lag (Samples)');
 ylabel('ACF');
 title(sprintf('%s residual ACF', upper(outputName)));
 legend({'Regime A', 'Regime B'}, 'Location', 'best');
@@ -1127,7 +1139,7 @@ cb = mean([cbA, cbB], 'omitnan');
 yline(cb, 'k--', 'LineWidth', 0.9);
 yline(-cb, 'k--', 'LineWidth', 0.9);
 yline(0, 'k:');
-xlabel('Lag (samples)');
+xlabel('Lag (Samples)');
 ylabel('CCF');
 title(sprintf('%s residual-input CCF (vs rudder PWM)', upper(outputName)));
 legend({'Regime A', 'Regime B'}, 'Location', 'best');
@@ -1264,7 +1276,7 @@ shadeRegimeBackground(gca, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
 shadeRegimeBackground(gca, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
 uistack([hYawReal, hYawPred], 'top');
 xlabel('Time (s)');
-ylabel('Yaw (rad, unwrapped)');
+ylabel('Yaw (Rad, Unwrapped)');
 title(sprintf('%s | yaw', trialName), 'Interpreter', 'none');
 legend({'Regime A', 'Regime B', 'Real', 'Predicted'}, 'Location', 'best');
 grid off;
