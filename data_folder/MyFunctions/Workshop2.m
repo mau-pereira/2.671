@@ -1,0 +1,35 @@
+load('BatteryDataWorkshop2.mat');  %Energy in kJ; MeanTemp in degC 
+Energy1 = Energy(:,1); 
+Energy2 = Energy(:,2); 
+Energy3 = Energy(:,3);
+
+Energy_unsorted = [Energy1;Energy2;Energy3];  %Combine the three battery energies into 1 vector 
+MeanTemp_unsorted = [MeanTemp;MeanTemp;MeanTemp];  %Combine the three battery temperatures into 1 vector 
+[MeanTemp_sorted, idx] = sort(MeanTemp_unsorted);  %Sort the temperature vector from lowest to highest 
+Energy_sorted = Energy_unsorted(idx); %Sort the energy vector to match the Temperature vector
+
+x = MeanTemp_sorted; 
+y = Energy_sorted; 
+shade_confidence_interval_workshop2;
+
+batteryfit=fit_object;
+
+
+%% Soccer ball
+load('SoccerWorkshop2.mat');  %Impact location (cm) and normalized exit speed (unitless) 
+
+x= ImpactLocation_cm; 
+y= NormExitSpeed;
+covar_predint_workshop2;
+
+x_max 
+x_unc_at_x_max 
+y_max = a*x_max^2 + b*x_max + c
+
+J = [x_max^2  x_max  1];
+y_unc_at_x_max = sqrt(J * c * J')
+
+x4 = 4;
+y4 = a*x4^2 + b*x4 + c
+J = [16 4 1];
+y4_unc = sqrt(J * c * J')

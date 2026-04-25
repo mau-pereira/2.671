@@ -6,7 +6,7 @@
 % sample std of measured y (good for dynamical data). Range-based RMSE/(ymax-ymin)
 % is optional — see legendNrmseMode.
 
-clear; clc; close all;
+clear; clc;
 
 scriptDir = fileparts(mfilename('fullpath'));
 dataDir = fullfile(scriptDir, 'rawdata_all_data');
@@ -35,8 +35,10 @@ idCsvFiles = {
     'prop1650rudder1775_1.csv'
     };
 
-%% Optional time crop on all loaded segments (same as run_n4sid_from_april22_csv.m)
-cropEndTimeSec = [];
+%% Optional tail trim on all loaded segments
+% Set to a positive value (seconds) to remove that much time from the end
+% of every trial. Example: 5 removes the last 5 seconds.
+cropEndTimeSec = [2];
 
 %% Paper-style estimation error (%): 100*abs(pred-real)/abs(real)
 % For numerical stability when real ~ 0, denominator is max(abs(real), floor).
@@ -484,9 +486,15 @@ if ~isfinite(cropEndTimeSec) || cropEndTimeSec <= 0
 end
 
 tRel = t - t(1);
-keep = tRel <= cropEndTimeSec;
+trialDurationSec = tRel(end);
+if cropEndTimeSec >= trialDurationSec
+    error('cropEndTimeSec=%g is >= trial duration %g s.', cropEndTimeSec, trialDurationSec);
+end
+
+% Keep all samples up to (end - cropEndTimeSec): trim only tail portion.
+keep = tRel <= (trialDurationSec - cropEndTimeSec);
 if nnz(keep) < 20
-    error('Time crop keeps too few samples (%d). Increase cropEndTimeSec.', nnz(keep));
+    error('Tail trim keeps too few samples (%d). Decrease cropEndTimeSec.', nnz(keep));
 end
 
 uOut = u(keep, :);
