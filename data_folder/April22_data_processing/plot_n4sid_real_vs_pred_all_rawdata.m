@@ -6,10 +6,12 @@
 % sample std of measured y (good for dynamical data). Range-based RMSE/(ymax-ymin)
 % is optional — see legendNrmseMode.
 
-clear; clc;
+clear; clc; close all;
 
 scriptDir = fileparts(mfilename('fullpath'));
 dataDir = fullfile(scriptDir, 'rawdata_all_data');
+addpath(fullfile(scriptDir, '..', 'MyFunctions'));
+exportCfg = makeFigureExportConfig(scriptDir);
 
 %% --- User: how to choose identification data for the model ---
 % Option C — use every experiment CSV in rawdata_all_data at once (same as
@@ -38,7 +40,7 @@ idCsvFiles = {
 %% Optional tail trim on all loaded segments
 % Set to a positive value (seconds) to remove that much time from the end
 % of every trial. Example: 5 removes the last 5 seconds.
-cropEndTimeSec = [2];
+cropEndTimeSec = [2.1];
 
 %% Paper-style estimation error (%): 100*abs(pred-real)/abs(real)
 % For numerical stability when real ~ 0, denominator is max(abs(real), floor).
@@ -48,6 +50,21 @@ pctErrSpeedFloor_mps = 0.05;
 legendNrmseMode = 'std';
 
 modelOrder = 2;
+
+%% Single validation trial (only this CSV is plotted)
+validationCsvFile = 'prop1650rudder2000_3.csv';
+
+%% Regime segmentation controls (same style used in level3_plot.m)
+stepFromPwm = 1500;
+stepFromTol = 70;
+stepDeltaMinPwm = 120;
+maxPeakSearchSec = 25;
+decelTailSec = 6;
+regimeAMaxSec = 35;
+settleAfterRegA_sec = 3;
+circleRudderMinDeltaPwm = 220;
+circleYawRateMinRadPerSec = 0.08;
+circleMinSamples = 40;
 
 %% Resolve identification CSV path(s)
 if idUseAllExperimentCsvsInFolder
@@ -70,81 +87,137 @@ sys = n4sid(z, nx, 'Focus', 'simulation');
 disp(['Identification source: ', idLabel]);
 present(sys);
 
-%% Every experiment CSV: one figure, speed + yaw real vs prediction
-csvPaths = listExperimentCsvPaths(dataDir);
-nFiles = numel(csvPaths);
+%% Single validation CSV: one figure, speed + yaw real vs prediction
+csvPath = fullfile(dataDir, validationCsvFile);
+[uVal, yVal, tVal] = loadIoFromCsv(csvPath);
+[uVal, yVal, tVal] = cropSignalsToTime(uVal, yVal, tVal, cropEndTimeSec);
 
-for k = 1:nFiles
-    csvPath = csvPaths{k};
-    [uVal, yVal, tVal] = loadIoFromCsv(csvPath);
-    [uVal, yVal, tVal] = cropSignalsToTime(uVal, yVal, tVal, cropEndTimeSec);
+[uPropPctVal, uRudderDegVal] = buildProcessedInputs(uVal);
+uValProc = [uPropPctVal, uRudderDegVal];
+[speedVal, yawValProc] = buildProcessedOutputs(yVal, tVal);
+yValProc = [speedVal, yawValProc];
 
-    [uPropPctVal, uRudderDegVal] = buildProcessedInputs(uVal);
-    uValProc = [uPropPctVal, uRudderDegVal];
-    [speedVal, yawValProc] = buildProcessedOutputs(yVal, tVal);
-    yValProc = [speedVal, yawValProc];
+zVal = iddata(yValProc, uValProc, Ts, ...
+    'InputName', {'u\_prop\_percent', 'u\_rudder\_deg'}, ...
+    'OutputName', {'speed', 'yaw'});
 
-    zVal = iddata(yValProc, uValProc, Ts, ...
-        'InputName', {'u\_prop\_percent', 'u\_rudder\_deg'}, ...
-        'OutputName', {'speed', 'yaw'});
+yValSim = sim(sys, zVal.u);
+tPlot = tVal - tVal(1);
+yawRealWrapped = wrapToPiLocal(yValProc(:, 2));
+yawPredWrapped = wrapToPiLocal(yValSim(:, 2));
+yawRealWrappedDeg = rad2deg(yawRealWrapped);
+yawPredWrappedDeg = rad2deg(yawPredWrapped);
 
-    yValSim = sim(sys, zVal.u);
-    tPlot = tVal - tVal(1);
+masks = makeRegimeMasks(uVal(:, 2), speedVal, yawValProc, tVal, ...
+    stepFromPwm, stepFromTol, stepDeltaMinPwm, ...
+    maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
+    settleAfterRegA_sec, circleRudderMinDeltaPwm, ...
+    circleYawRateMinRadPerSec, circleMinSamples);
 
-    % Validation metrics: shape (Pearson r) + normalized RMSE + Theil decomposition.
-    fitM = validationFitMetrics(yValProc, yValSim, legendNrmseMode);
-    disp(sprintf('%s | speed: r=%.3f, Ub/Uv/Uc=%.1f/%.1f/%.1f%% | yaw: r=%.3f, Ub/Uv/Uc=%.1f/%.1f/%.1f%%', ...
-        shortLabelForLog(csvPath), ...
-        fitM.r(1), 100 * fitM.theil(1,1), 100 * fitM.theil(1,2), 100 * fitM.theil(1,3), ...
-        fitM.r(2), 100 * fitM.theil(2,1), 100 * fitM.theil(2,2), 100 * fitM.theil(2,3)));
+figOutputs = figure('Name', sprintf('n4sid: %s (ID: %s)', validationCsvFile, idLabel), 'Color', 'w');
+setFigureFullScreen(figOutputs);
+tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-    yawRealWrapped = wrapToPiLocal(yValProc(:, 2));
-    yawPredWrapped = wrapToPiLocal(yValSim(:, 2));
+nexttile;
+ax1 = gca;
+hold(ax1, 'on');
+hSpdReal = plot(ax1, tPlot, yValProc(:, 1), 'k-', 'LineWidth', 2.4);
+hSpdPred = plot(ax1, tPlot, yValSim(:, 1), 'k--', 'LineWidth', 2.4);
+shadeRegimeBackground(ax1, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
+shadeRegimeBackground(ax1, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
+uistack([hSpdReal, hSpdPred], 'top');
+ylabel('Speed (m/s)');
+% hRegA1 = patch(ax1, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% hRegB1 = patch(ax1, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% legend(ax1, [hSpdReal, hSpdPred, hRegA1, hRegB1], ...
+%     {'Real', 'Predicted', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
+grid(ax1, 'off');
+hold(ax1, 'off');
 
-    pctSpd = percentErrorPaperStyle(yValSim(:, 1), yValProc(:, 1), pctErrSpeedFloor_mps);
-    pctYaw = percentErrorPaperStyleWrappedYaw(yawPredWrapped, yawRealWrapped);
-    maxPctSpd = max(pctSpd);
-    maxPctYaw = max(pctYaw);
+nexttile;
+ax2 = gca;
+hold(ax2, 'on');
+hYawReal = plot(ax2, tPlot, yawRealWrappedDeg, 'k-', 'LineWidth', 2.4);
+hYawPred = plot(ax2, tPlot, yawPredWrappedDeg, 'k--', 'LineWidth', 2.4);
+shadeRegimeBackground(ax2, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
+shadeRegimeBackground(ax2, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
+uistack([hYawReal, hYawPred], 'top');
+xlabel('Time (s)');
+ylabel('Yaw (degrees)');
+% hRegA2 = patch(ax2, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% hRegB2 = patch(ax2, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% legend(ax2, [hYawReal, hYawPred, hRegA2, hRegB2], ...
+%     {'Real', 'Predicted', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
+grid(ax2, 'off');
+hold(ax2, 'off');
 
-    [~, fname, ext] = fileparts(csvPath);
-    shortName = [fname, ext];
+improvePlot();
 
-    figure('Name', sprintf('n4sid: %s (ID: %s)', shortName, idLabel));
-    tiledlayout(4, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+% Apply padding after improvePlot() so axis limits are not overwritten.
+applyPaddedAxes(ax1, tPlot, [yValProc(:, 1); yValSim(:, 1)]);
+applyPaddedAxes(ax2, tPlot, [yawRealWrappedDeg; yawPredWrappedDeg]);
 
-    nexttile;
-    hSpdReal = plot(tPlot, yValProc(:, 1), 'k', 'LineWidth', 1.2); hold on;
-    hSpdPred = plot(tPlot, yValSim(:, 1), 'r--', 'LineWidth', 1.2);
-    ylabel('Speed (m/s)');
-    title(sprintf('%s — speed', shortName), 'Interpreter', 'none');
-    applyMetricsLegend(gca, hSpdReal, hSpdPred, fitM.r(1), fitM.theil(1, :));
-    grid on;
+%% Second figure: control inputs vs time (propeller % and rudder degrees)
+figInputs = figure('Name', sprintf('Inputs: %s', validationCsvFile), 'Color', 'w');
+setFigureFullScreen(figInputs);
+tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
 
-    nexttile;
-    plot(tPlot, pctSpd, 'b', 'LineWidth', 1.1);
-    yline(0, 'k:', 'LineWidth', 0.8);
-    ylabel('Speed err (%)');
-    title('Absolute percent estimation error', 'Interpreter', 'none');
-    grid on;
+nexttile;
+ax3 = gca;
+hold(ax3, 'on');
+hPropCmd = plot(ax3, tPlot, uPropPctVal, 'k-', 'LineWidth', 2.4);
+shadeRegimeBackground(ax3, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
+shadeRegimeBackground(ax3, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
+uistack(hPropCmd, 'top');
+ylabel('Propeller Thrust (%)');
+% hRegA3 = patch(ax3, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% hRegB3 = patch(ax3, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% legend(ax3, [hPropCmd, hRegA3, hRegB3], ...
+%     {'Command', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
+grid(ax3, 'off');
+hold(ax3, 'off');
 
-    nexttile;
-    hYawReal = plot(tPlot, yawRealWrapped, 'k', 'LineWidth', 1.2); hold on;
-    hYawPred = plot(tPlot, yawPredWrapped, 'r--', 'LineWidth', 1.2);
-    ylabel('Yaw (rad, wrapped)');
-    title(sprintf('%s — yaw', shortName), 'Interpreter', 'none');
-    applyMetricsLegend(gca, hYawReal, hYawPred, fitM.r(2), fitM.theil(2, :));
-    grid on;
+nexttile;
+ax4 = gca;
+hold(ax4, 'on');
+hRudCmd = plot(ax4, tPlot, uRudderDegVal, 'k-', 'LineWidth', 2.4);
+shadeRegimeBackground(ax4, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
+shadeRegimeBackground(ax4, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
+uistack(hRudCmd, 'top');
+xlabel('Time (s)');
+ylabel('Propeller Angle (degrees)');
+% hRegA4 = patch(ax4, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% hRegB4 = patch(ax4, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+% legend(ax4, [hRudCmd, hRegA4, hRegB4], ...
+%     {'Command', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
+grid(ax4, 'off');
+hold(ax4, 'off');
 
-    nexttile;
-    plot(tPlot, pctYaw, 'b', 'LineWidth', 1.1);
-    yline(0, 'k:', 'LineWidth', 0.8);
-    xlabel('Time (s)');
-    ylabel('Yaw err (%)');
-    title('Absolute percent estimation error', 'Interpreter', 'none');
-    grid on;
+improvePlot();
 
-    sgtitle(sprintf('Model ID: %s', idLabel), 'Interpreter', 'none');
-end
+% Apply padding after improvePlot() so axis limits are not overwritten.
+applyPaddedAxes(ax3, tPlot, uPropPctVal);
+applyPaddedAxes(ax4, tPlot, uRudderDegVal);
+
+%% Standalone legend figure (Real / Predicted / Regime A / Regime B)
+figLegend = figure('Name', 'Legend (real vs predicted)', 'Color', 'w');
+axL = axes('Parent', figLegend);
+hold(axL, 'on');
+hLegReal  = plot(axL, NaN, NaN, 'k-',  'LineWidth', 2.4);
+hLegPred  = plot(axL, NaN, NaN, 'k--', 'LineWidth', 2.4);
+hLegRegA  = patch(axL, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+hLegRegB  = patch(axL, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+axis(axL, 'off');
+lgd = legend(axL, [hLegReal, hLegPred, hLegRegA, hLegRegB], ...
+    {'Real', 'Predicted', 'Regime A', 'Regime B'}, ...
+    'Orientation', 'vertical', 'Location', 'north', 'Box', 'on');
+set(lgd, 'FontSize', 16);
+improvePlot();
+
+%% Export figures to processed_data
+exportFigurePng(figOutputs, fullfile(exportCfg.outDir, 'level1_2_outputs_and_validation.png'), exportCfg);
+exportFigurePng(figInputs,  fullfile(exportCfg.outDir, 'level1_2_inputs.png'), exportCfg);
+exportFigurePng(figLegend,  fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
 
 %% --- Local functions -------------------------------------------------
 
@@ -545,4 +618,107 @@ end
 speed = filtfilt(bSpd, aSpd, speed);
 % Use unwrapped yaw for identification; wrapped/sawtooth is handled in plotting.
 yawOut = unwrap(yaw);
+end
+
+function masks = makeRegimeMasks(uRudderPwm, speed, yawUnwrapped, t, ...
+    stepFromPwm, stepFromTol, stepDeltaMinPwm, maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
+    settleAfterRegA_sec, circleRudderMinDeltaPwm, circleYawRateMinRadPerSec, circleMinSamples)
+% Same regime style used in level3_plot.m.
+n = numel(t);
+mA = false(n, 1);
+mB = false(n, 1);
+
+du = [0; diff(uRudderPwm)];
+nearFrom = abs(uRudderPwm - stepFromPwm) <= stepFromTol;
+stepCandidates = find((abs(du) >= stepDeltaMinPwm) & [false; nearFrom(1:end-1)]);
+
+if isempty(stepCandidates)
+    mA(:) = true;
+    masks = struct('A', mA, 'B', mB);
+    return;
+end
+
+% Keep the same A/B split behavior used in the level3 helper.
+stepIdx = stepCandidates(1); %#ok<NASGU,ASGLU>
+regAEnd = max(1, stepCandidates(1) - 1);
+mA(1:regAEnd) = true;
+startB = min(n, regAEnd + 1);
+mB(startB:end) = true;
+
+% Unused arguments intentionally kept to preserve a compatible call shape.
+unusedArgs = [maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
+    settleAfterRegA_sec, circleRudderMinDeltaPwm, circleYawRateMinRadPerSec, circleMinSamples, ...
+    mean(speed, 'omitnan'), mean(yawUnwrapped, 'omitnan')]; %#ok<NASGU>
+
+masks = struct('A', mA, 'B', mB);
+end
+
+function shadeRegimeBackground(ax, tPlot, mask, colorRgb, alphaVal)
+if ~any(mask)
+    return;
+end
+yl = ylim(ax);
+[starts, ends] = maskToSegments(mask);
+for i = 1:numel(starts)
+    x1 = tPlot(starts(i));
+    x2 = tPlot(ends(i));
+    patch(ax, [x1 x2 x2 x1], [yl(1) yl(1) yl(2) yl(2)], colorRgb, ...
+        'FaceAlpha', alphaVal, 'EdgeColor', 'none', 'HandleVisibility', 'off');
+end
+uistack(findobj(ax, 'Type', 'patch'), 'bottom');
+end
+
+function [starts, ends] = maskToSegments(mask)
+mask = mask(:);
+d = diff([false; mask; false]);
+starts = find(d == 1);
+ends = find(d == -1) - 1;
+end
+
+function applyPaddedAxes(ax, tVals, yVals)
+xMin = min(tVals);
+xMax = max(tVals);
+xSpan = max(eps, xMax - xMin);
+xPad = 0.02 * xSpan;
+xlim(ax, [xMin - xPad, xMax + xPad]);
+
+yMin = min(yVals);
+yMax = max(yVals);
+ySpan = max(eps, yMax - yMin);
+yPad = 0.18 * ySpan;
+ylim(ax, [yMin - yPad, yMax + yPad]);
+end
+
+function cfg = makeFigureExportConfig(scriptDir)
+cfg = struct();
+cfg.outDir = fullfile(scriptDir, '..', 'processed_data');
+if ~exist(cfg.outDir, 'dir')
+    mkdir(cfg.outDir);
+end
+cfg.exportResolution = 220;
+end
+
+function exportFigurePng(fig, outPath, cfg)
+% Export the figure at its current on-screen aspect ratio (no forced square).
+set(fig, 'Color', 'w');
+drawnow;
+exportgraphics(fig, outPath, 'Resolution', cfg.exportResolution, ...
+    'ContentType', 'image', 'BackgroundColor', 'white');
+fprintf('Saved PNG: %s\n', outPath);
+end
+
+function setFigureFullScreen(fig)
+% Make the figure occupy nearly the full screen (wide rectangle, not square).
+if nargin < 1 || isempty(fig) || ~ishandle(fig)
+    fig = gcf;
+end
+set(fig, 'Units', 'pixels');
+scr = get(0, 'ScreenSize'); % [left bottom width height]
+padLeftRight = 30;
+padTopBottom = 80; % leave room for title bar / taskbar
+w = max(800, scr(3) - 2 * padLeftRight);
+h = max(500, scr(4) - 2 * padTopBottom);
+x = scr(1) + padLeftRight;
+y = scr(2) + padTopBottom;
+set(fig, 'Position', [x, y, w, h]);
 end

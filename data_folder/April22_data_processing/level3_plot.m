@@ -110,11 +110,11 @@ end
 figure('Name', 'Level3: Pearson r - speed (regime A/B)');
 setFigureMaxSquareOnScreen(gcf);
 makePearsonOutputRegimeScatter(trialRows, 'speed');
-exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_pearson_speed.png'), exportCfg);
+% exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_pearson_speed.png'), exportCfg);
 figure('Name', 'Level3: Pearson r - yaw (regime A/B)');
 setFigureMaxSquareOnScreen(gcf);
 makePearsonOutputRegimeScatter(trialRows, 'yaw');
-exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_pearson_yaw.png'), exportCfg);
+% exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_pearson_yaw.png'), exportCfg);
 
 %% Plot 2: Theil decomposition means by output and regime
 figure('Name', 'Level3: Theil decomposition by regime');
@@ -149,7 +149,7 @@ text(axTheil, 3.5, yTxt, 'Yaw', 'HorizontalAlignment', 'center', ...
     'VerticalAlignment', 'top', 'Interpreter', 'none', 'Clipping', 'off', ...
     'FontSize', axFs, 'FontWeight', axFw);
 setFigureMaxSquareOnScreen(gcf);
-exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_theil_decomposition_by_regime.png'), exportCfg);
+% exportSquareFigurePng(gcf, fullfile(exportCfg.outDir, 'level3_theil_decomposition_by_regime.png'), exportCfg);
 
 %% Plot 3: Theil U^B, U^C, U^V vs propeller percent — one figure per output × component (regime A/B; rudders pooled)
 theilIdxBcv = [1, 3, 2]; % U^B, U^C, U^V
@@ -159,7 +159,7 @@ for io = 1:numel(outsTheil)
     for jc = 1:numel(theilIdxBcv)
         figTheil = makeTheilSingleFigure(trialRows, outsTheil{io}, theilIdxBcv(jc), theilTexBcv{jc});
         outName = sprintf('level3_theil_%s_%s.png', lower(outsTheil{io}), strrep(theilTexBcv{jc}, '^', ''));
-        exportSquareFigurePng(figTheil, fullfile(exportCfg.outDir, outName), exportCfg);
+        % exportSquareFigurePng(figTheil, fullfile(exportCfg.outDir, outName), exportCfg);
     end
 end
 
@@ -200,6 +200,10 @@ fprintf('speed-A: [%.3f %.3f %.3f]\n', theilMeans(1, :));
 fprintf('speed-B: [%.3f %.3f %.3f]\n', theilMeans(2, :));
 fprintf('yaw-A:   [%.3f %.3f %.3f]\n', theilMeans(3, :));
 fprintf('yaw-B:   [%.3f %.3f %.3f]\n', theilMeans(4, :));
+
+%% Per-trial validation table for a chosen trial (matches plot_n4sid_real_vs_pred_all_rawdata.m)
+validationTrialFile = 'prop1650rudder2000_3.csv';
+printValidationTrialTable(trialRows, validationTrialFile);
 
 % disp('--- Residual ACF diagnostics (exclude lag 0) ---');
 % printAcfDiagnostics(trialRows, 'speed', 'A');
@@ -1455,6 +1459,41 @@ if numel(zList) == 1
     z = zList{1};
 else
     z = merge(zList{:});
+end
+end
+
+function printValidationTrialTable(trialRows, trialFile)
+% Per-regime per-output table (Pearson r + Theil U^B/U^C/U^V) for one trial.
+% Theil column order from theilMseProportions is [U^B, U^V, U^C], so we
+% explicitly reorder to print U^B, U^C, U^V (the order requested for the report).
+fprintf('\n--- Validation trial: %s ---\n', trialFile);
+if ~isstruct(trialRows) || isempty(trialRows)
+    fprintf('No trial rows available.\n');
+    return;
+end
+mask = strcmp({trialRows.trial}, trialFile);
+sub = trialRows(mask);
+if isempty(sub)
+    fprintf('No matching trial rows for %s.\n', trialFile);
+    return;
+end
+
+for regCell = {'A', 'B'}
+    reg = regCell{1};
+    rowMask = strcmp({sub.regime}, reg);
+    if ~any(rowMask)
+        fprintf('\n            Regime %s: no data\n', reg);
+        continue;
+    end
+    sr = sub(rowMask);
+    sr = sr(1);
+
+    fprintf('\n            Regime %s\n', reg);
+    fprintf('            %-9s %-9s\n', 'speed', 'yaw');
+    fprintf('r           %-9.3f %-9.3f\n', sr.r_speed, sr.r_yaw);
+    fprintf('U^B         %-9.3f %-9.3f\n', sr.th_speed(1), sr.th_yaw(1));
+    fprintf('U^C         %-9.3f %-9.3f\n', sr.th_speed(3), sr.th_yaw(3));
+    fprintf('U^V         %-9.3f %-9.3f\n', sr.th_speed(2), sr.th_yaw(2));
 end
 end
 
