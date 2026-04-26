@@ -25,7 +25,7 @@ idCsvFiles = {
     };
 
 %% Shared preprocessing controls
-cropEndTimeSec = 2;
+cropEndTimeSec = 2.1;
 modelOrder = 2;
 
 %% Regime segmentation controls

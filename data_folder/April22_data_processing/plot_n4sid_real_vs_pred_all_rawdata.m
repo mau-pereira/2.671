@@ -53,6 +53,9 @@ modelOrder = 2;
 
 %% Single validation trial (only this CSV is plotted)
 validationCsvFile = 'prop1650rudder2000_3.csv';
+plotRawOnly = true; % true: show only raw-data point plots (no lines), then stop.
+plotAllRawXyInFolder = false; % true: plot X vs Y for every CSV in rawdata_all_data, then stop.
+rawXyFolder = fullfile(scriptDir, 'deprecated_processing_scripts', 'rawdata_april22');
 
 %% Regime segmentation controls (same style used in level3_plot.m)
 stepFromPwm = 1500;
@@ -65,6 +68,34 @@ settleAfterRegA_sec = 3;
 circleRudderMinDeltaPwm = 220;
 circleYawRateMinRadPerSec = 0.08;
 circleMinSamples = 40;
+
+%% Raw-data-only mode: plot X vs Y for all CSVs in rawXyFolder, then exit
+if plotAllRawXyInFolder
+    allCsvPaths = listExperimentCsvPaths(rawXyFolder);
+    for iCsv = 1:numel(allCsvPaths)
+        oneCsvPath = allCsvPaths{iCsv};
+        [uRaw, yRawAll, tRawAll] = loadIoFromCsv(oneCsvPath, false);
+        [~, yRawAll, ~] = cropSignalsToTime(uRaw, yRawAll, tRawAll, cropEndTimeSec);
+        xRawAll = yRawAll(:, 1);
+        yRawAllPos = yRawAll(:, 2);
+
+        [~, oneName, oneExt] = fileparts(oneCsvPath);
+        oneLabel = [oneName, oneExt];
+        figXY = figure('Name', sprintf('Raw Y vs X: %s', oneLabel), 'Color', 'w');
+        setFigureFullScreen(figXY);
+        axXY = axes('Parent', figXY);
+        scatter(axXY, xRawAll, yRawAllPos, 8, 'o', ...
+            'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'none', 'LineWidth', 0.6);
+        xlabel(axXY, 'X');
+        ylabel(axXY, 'Y');
+        axis(axXY, 'equal');
+        grid(axXY, 'on');
+        improvePlot();
+        applyPaddedAxes(axXY, xRawAll, yRawAllPos);
+        setEqualDivisionTicks(axXY);
+    end
+    return;
+end
 
 %% Resolve identification CSV path(s)
 if idUseAllExperimentCsvsInFolder
@@ -91,6 +122,99 @@ present(sys);
 csvPath = fullfile(dataDir, validationCsvFile);
 [uVal, yVal, tVal] = loadIoFromCsv(csvPath);
 [uVal, yVal, tVal] = cropSignalsToTime(uVal, yVal, tVal, cropEndTimeSec);
+
+%% Raw data plots (points only): y vs x and yaw vs time
+tRaw = tVal - tVal(1);
+xRaw = yVal(:, 1);
+yRaw = yVal(:, 2);
+yawRawDeg = rad2deg(yVal(:, 3));
+[speedRaw, yawRawUnwrapped] = buildProcessedOutputs(yVal, tVal);
+masksRaw = makeRegimeMasks(uVal(:, 2), speedRaw, yawRawUnwrapped, tVal, ...
+    stepFromPwm, stepFromTol, stepDeltaMinPwm, ...
+    maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
+    settleAfterRegA_sec, circleRudderMinDeltaPwm, ...
+    circleYawRateMinRadPerSec, circleMinSamples);
+
+figRawXY = figure('Name', sprintf('Raw Y vs X: %s', validationCsvFile), 'Color', 'w');
+setFigureFullScreen(figRawXY);
+axRaw1 = axes('Parent', figRawXY);
+hold(axRaw1, 'on');
+if any(masksRaw.A)
+    hRawA_xy = scatter(axRaw1, xRaw(masksRaw.A), yRaw(masksRaw.A), 10, 'o', ...
+        'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+else
+    hRawA_xy = scatter(axRaw1, NaN, NaN, 10, 'o', ...
+        'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+end
+if any(masksRaw.B)
+    hRawB_xy = scatter(axRaw1, xRaw(masksRaw.B), yRaw(masksRaw.B), 10, 'o', ...
+        'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+else
+    hRawB_xy = scatter(axRaw1, NaN, NaN, 10, 'o', ...
+        'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+end
+xlabel(axRaw1, 'X (m)');
+ylabel(axRaw1, 'Y (m)');
+axis(axRaw1, 'equal');
+grid(axRaw1, 'off');
+axes(axRaw1); %#ok<LAXES>
+improvePlot();
+hold(axRaw1, 'off');
+
+figRawYaw = figure('Name', sprintf('Raw Yaw vs Time: %s', validationCsvFile), 'Color', 'w');
+setFigureFullScreen(figRawYaw);
+axRaw2 = axes('Parent', figRawYaw);
+hold(axRaw2, 'on');
+if any(masksRaw.A)
+    hRawA_yaw = scatter(axRaw2, tRaw(masksRaw.A), yawRawDeg(masksRaw.A), 10, 'o', ...
+        'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+else
+    hRawA_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
+        'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+end
+if any(masksRaw.B)
+    hRawB_yaw = scatter(axRaw2, tRaw(masksRaw.B), yawRawDeg(masksRaw.B), 10, 'o', ...
+        'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+else
+    hRawB_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
+        'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+end
+xlabel(axRaw2, 'Time (s)');
+ylabel(axRaw2, 'Yaw (degrees)');
+grid(axRaw2, 'off');
+axes(axRaw2); %#ok<LAXES>
+improvePlot();
+hold(axRaw2, 'off');
+
+figRawLegend = figure('Name', sprintf('Legend: %s', validationCsvFile), 'Color', 'w');
+axRawL = axes('Parent', figRawLegend);
+hold(axRawL, 'on');
+hLegA = scatter(axRawL, NaN, NaN, 10, 'o', ...
+    'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+hLegB = scatter(axRawL, NaN, NaN, 10, 'o', ...
+    'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+axis(axRawL, 'off');
+legend(axRawL, [hLegA, hLegB], {'Regime A', 'Regime B'}, ...
+    'Location', 'north', 'Interpreter', 'none', 'Box', 'on');
+improvePlot();
+hold(axRawL, 'off');
+
+applyPaddedAxesCustom(axRaw1, xRaw, yRaw, 0.04);
+setEqualDivisionTicks(axRaw1);
+applyPaddedAxes(axRaw2, tRaw, yawRawDeg);
+
+% Export raw-only figures to data_folder/processed_data
+rawExportDir = fullfile(scriptDir, '..', 'processed_data');
+if ~exist(rawExportDir, 'dir')
+    mkdir(rawExportDir);
+end
+exportFigurePng(figRawXY, fullfile(rawExportDir, 'level1_trajectory.png'), exportCfg);
+exportFigurePng(figRawYaw, fullfile(rawExportDir, 'level1_yaw.png'), exportCfg);
+exportFigurePng(figRawLegend, fullfile(rawExportDir, 'level1_legened.png'), exportCfg);
+
+if plotRawOnly
+    return;
+end
 
 [uPropPctVal, uRudderDegVal] = buildProcessedInputs(uVal);
 uValProc = [uPropPctVal, uRudderDegVal];
@@ -215,9 +339,9 @@ set(lgd, 'FontSize', 16);
 improvePlot();
 
 %% Export figures to processed_data
-exportFigurePng(figOutputs, fullfile(exportCfg.outDir, 'level1_2_outputs_and_validation.png'), exportCfg);
-exportFigurePng(figInputs,  fullfile(exportCfg.outDir, 'level1_2_inputs.png'), exportCfg);
-exportFigurePng(figLegend,  fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
+% exportFigurePng(figOutputs, fullfile(exportCfg.outDir, 'level1_2_outputs_and_validation.png'), exportCfg);
+% exportFigurePng(figInputs,  fullfile(exportCfg.outDir, 'level1_2_inputs.png'), exportCfg);
+% exportFigurePng(figLegend,  fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
 
 %% --- Local functions -------------------------------------------------
 
@@ -520,21 +644,56 @@ names = names(ix);
 paths = cellfun(@(n) fullfile(dataDir, n), names, 'UniformOutput', false);
 end
 
-function [u, y, t] = loadIoFromCsv(csvPath)
+function [u, y, t] = loadIoFromCsv(csvPath, requireYaw)
+if nargin < 2
+    requireYaw = true;
+end
 if ~isfile(csvPath)
     error('CSV file not found: %s', csvPath);
 end
 
 T = readtable(csvPath);
-requiredVars = {'timestamp', 'u_propeller_pwm', 'u_rudder_pwm', 'x', 'y', 'yaw'};
-missingVars = requiredVars(~ismember(requiredVars, T.Properties.VariableNames));
-if ~isempty(missingVars)
-    error('Missing required column(s) in %s: %s', csvPath, strjoin(missingVars, ', '));
+vn = T.Properties.VariableNames;
+vnNorm = lower(strrep(strrep(strtrim(vn), '_', ''), ' ', ''));
+
+idxTimestamp = find(strcmp(vnNorm, 'timestamp'), 1, 'first');
+idxX = find(strcmp(vnNorm, 'x'), 1, 'first');
+idxY = find(strcmp(vnNorm, 'y'), 1, 'first');
+
+idxProp = find(strcmp(vnNorm, 'upropellerpwm'), 1, 'first');
+if isempty(idxProp)
+    idxProp = find(strcmp(vnNorm, 'pwmprop'), 1, 'first');
 end
 
-u = [T.u_propeller_pwm, T.u_rudder_pwm];
-y = [T.x, T.y, T.yaw];
-t = T.timestamp;
+idxRudder = find(strcmp(vnNorm, 'urudderpwm'), 1, 'first');
+if isempty(idxRudder)
+    idxRudder = find(strcmp(vnNorm, 'pwmrudder'), 1, 'first');
+end
+
+idxYaw = find(strcmp(vnNorm, 'yaw'), 1, 'first');
+if isempty(idxYaw)
+    idxYaw = find(strcmp(vnNorm, 'heading'), 1, 'first');
+end
+
+missing = {};
+if isempty(idxTimestamp), missing{end+1} = 'timestamp'; end %#ok<AGROW>
+if isempty(idxX), missing{end+1} = 'x'; end %#ok<AGROW>
+if isempty(idxY), missing{end+1} = 'y'; end %#ok<AGROW>
+if isempty(idxProp), missing{end+1} = 'u_propeller_pwm or pwm prop'; end %#ok<AGROW>
+if isempty(idxRudder), missing{end+1} = 'u_rudder_pwm or pwm rudder'; end %#ok<AGROW>
+if requireYaw && isempty(idxYaw), missing{end+1} = 'yaw (or heading)'; end %#ok<AGROW>
+if ~isempty(missing)
+    error('Missing required column(s) in %s: %s', csvPath, strjoin(missing, ', '));
+end
+
+t = T{:, idxTimestamp};
+u = [T{:, idxProp}, T{:, idxRudder}];
+if isempty(idxYaw)
+    yawCol = zeros(size(T{:, idxX}));
+else
+    yawCol = T{:, idxYaw};
+end
+y = [T{:, idxX}, T{:, idxY}, yawCol];
 
 validRows = all(isfinite([u, y, t]), 2);
 u = u(validRows, :);
@@ -687,6 +846,62 @@ yMax = max(yVals);
 ySpan = max(eps, yMax - yMin);
 yPad = 0.18 * ySpan;
 ylim(ax, [yMin - yPad, yMax + yPad]);
+end
+
+function applyPaddedAxesCustom(ax, xVals, yVals, padFrac)
+if nargin < 4 || ~isfinite(padFrac) || padFrac < 0
+    padFrac = 0.18;
+end
+xMin = min(xVals);
+xMax = max(xVals);
+xSpan = max(eps, xMax - xMin);
+xPad = padFrac * xSpan;
+xlim(ax, [xMin - xPad, xMax + xPad]);
+
+yMin = min(yVals);
+yMax = max(yVals);
+ySpan = max(eps, yMax - yMin);
+yPad = padFrac * ySpan;
+ylim(ax, [yMin - yPad, yMax + yPad]);
+end
+
+function setEqualDivisionTicks(ax)
+% Force equal x/y tick spacing for XY scatter readability.
+xl = xlim(ax);
+yl = ylim(ax);
+targetTicks = 6;
+step = niceTickStep(max(diff(xl), diff(yl)) / targetTicks);
+if ~isfinite(step) || step <= 0
+    return;
+end
+xt = (ceil(xl(1) / step) * step):step:(floor(xl(2) / step) * step);
+yt = (ceil(yl(1) / step) * step):step:(floor(yl(2) / step) * step);
+if numel(xt) >= 2
+    set(ax, 'XTick', xt);
+end
+if numel(yt) >= 2
+    set(ax, 'YTick', yt);
+end
+axis(ax, 'equal');
+end
+
+function s = niceTickStep(v)
+if ~isfinite(v) || v <= 0
+    s = NaN;
+    return;
+end
+e = floor(log10(v));
+f = v / 10^e;
+if f <= 1
+    nf = 1;
+elseif f <= 2
+    nf = 2;
+elseif f <= 5
+    nf = 5;
+else
+    nf = 10;
+end
+s = nf * 10^e;
 end
 
 function cfg = makeFigureExportConfig(scriptDir)
