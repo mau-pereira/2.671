@@ -22,8 +22,8 @@ import numpy as np
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Set this once to choose which calibration dataset folder to load intrinsics from.
 # This folder is expected under experiment_scripts/calibration/.
-DATASET_FOLDER = os.path.join("calibration_images_april21")
-INTRINSICS_FILENAME = "calibration_intrinsics_april21.yaml"
+DATASET_FOLDER = os.path.join("calibration_images_may1")
+INTRINSICS_FILENAME = "calibration_intrinsics_may1.yaml"
 INTRINSICS_PATH = os.path.join(SCRIPT_DIR, DATASET_FOLDER, INTRINSICS_FILENAME)
 CALIBRATION_EXTRINSICS_PATH = os.path.join(SCRIPT_DIR, "calibration_extrinsics.yaml")
 
@@ -42,10 +42,10 @@ EXTRINSICS_POOL_MARKER_COUNT = 4
 USE_EXTRINSICS_MARKER_PRESET = True
 # Each row: (aruco_id, x_in, y_in, z_in) inches, flat pool plane (z=0).
 EXTRINSICS_PRESET_MARKERS_INCHES = (
-    (0, 160.0, -60.0, 0.0),
-    (1, 0.0, -60.0, 0.0),
-    (2, 0.0, 0.0, 0.0),
-    (3, 160.0, 0.0, 0.0),
+    (0, 0.0, 115.0, 0.0),
+    (2, 0.0, 95.0, 0.0),
+    (3, -110.0, 0.0, 0.0),
+    (4, -45.0, 0.0, 0.0),
 )
 
 

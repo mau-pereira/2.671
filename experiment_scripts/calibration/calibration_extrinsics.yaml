@@ -4,11 +4,11 @@ rvec_world_to_cam: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
-   data: [ 0.41164799755656634, -1.9114476208308884, 1.3426653246931717 ]
+   data: [ 2.3771219871733154, 0.005611179626440344,
+       -0.12011216724071888 ]
 tvec_world_to_cam: !!opencv-matrix
    rows: 3
    cols: 1
    dt: d
-   data: [ -0.55999480390847789, 0.55832606514477268,
-       -0.66726952956762409 ]
-extrinsics_reprojection_rmse_px: 20297.71484375
+   data: [ 1.8954050441316157, 0.33812707235294781, 1.2762691818487222 ]
+extrinsics_reprojection_rmse_px: 8.7095947265625
