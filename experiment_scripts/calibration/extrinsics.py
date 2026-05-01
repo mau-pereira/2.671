@@ -172,8 +172,8 @@ def get_extrinsics(camera_index: int, k: np.ndarray, d: np.ndarray):
 
     cam = cv2.VideoCapture(camera_index)
     cam.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
-    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160)
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1440)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     if not cam.isOpened():
         raise RuntimeError(f"Failed to open camera index {camera_index}.")
 
@@ -181,7 +181,7 @@ def get_extrinsics(camera_index: int, k: np.ndarray, d: np.ndarray):
     num_captures_target = 50
 
     cv2.namedWindow("ExtrinsicsCapture", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("ExtrinsicsCapture", 1280, 720)
+    cv2.resizeWindow("ExtrinsicsCapture", 960, 720)
     print(
         f"Auto-capture: waiting until ALL marker IDs {sorted(required_ids)} appear in one frame. "
         f"Will capture {num_captures_target} such frames, then solve. Press 'q' to abort."

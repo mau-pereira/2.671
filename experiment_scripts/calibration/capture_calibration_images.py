@@ -3,8 +3,8 @@ import sys
 
 import cv2
 
-REQUESTED_WIDTH = 3840
-REQUESTED_HEIGHT = 2160
+REQUESTED_WIDTH = 1440
+REQUESTED_HEIGHT = 1080
 
 # def _fourcc_to_str(cap: cv2.VideoCapture) -> str:
 #     code = int(cap.get(cv2.CAP_PROP_FOURCC))
@@ -35,7 +35,7 @@ def main() -> None:
     # print(f"Device reports (CAP_PROP): {prop_w}x{prop_h}, FOURCC={_fourcc_to_str(cap)!r}")
 
     cv2.namedWindow("Calibration Capture", cv2.WINDOW_NORMAL)
-    cv2.resizeWindow("Calibration Capture", 480, 270)
+    cv2.resizeWindow("Calibration Capture", 480, 360)
 
     print(f'Saving all images to this folder "{output_dir}"')
     print("Press 's' to save image, 'q' to quit.")

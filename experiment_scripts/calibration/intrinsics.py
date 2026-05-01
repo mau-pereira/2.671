@@ -50,7 +50,7 @@ square_size = 0.023 # Size, in meters, of a square side
 
 # Preview window: full-resolution frames are downscaled for imshow only (calibration still uses full size).
 PREVIEW_MAX_WIDTH = 960
-PREVIEW_MAX_HEIGHT = 540
+PREVIEW_MAX_HEIGHT = 720
 
 
 def resize_for_preview(image_bgr, max_w=PREVIEW_MAX_WIDTH, max_h=PREVIEW_MAX_HEIGHT):
