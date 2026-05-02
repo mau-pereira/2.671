@@ -20,13 +20,13 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 INTRINSICS_PATH = os.path.join(
     SCRIPT_DIR,
     "calibration",
-    "calibration_images_april21",
-    "calibration_intrinsics_april21.yaml",
+    "calibration_images_may1",
+    "calibration_intrinsics_may1.yaml",
 )
 EXTRINSICS_PATH = os.path.join(
     SCRIPT_DIR,
     "calibration",
-    "calibration_extrinsics_april21.yaml",
+    "calibration_extrinsics_may1.yaml",
 )
 
 CAMERA_INDEX = 1
@@ -35,7 +35,7 @@ TARGET_TAG_ID = 0
 DURATION_S = 30
 SHOW_CAMERA_FEED = True
 
-FRAME_WIDTH = 1920
+FRAME_WIDTH = 1440
 FRAME_HEIGHT = 1080
 CAMERA_FPS = 60
 MANUAL_EXPOSURE = -6
