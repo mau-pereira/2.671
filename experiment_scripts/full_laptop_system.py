@@ -12,8 +12,10 @@ import websocket
 from test_trajectory_read import (
     CAMERA_INDEX,
     CAMERA_FPS,
+    EXTRINSICS_PATH,
     FRAME_HEIGHT,
     FRAME_WIDTH,
+    INTRINSICS_PATH,
     MANUAL_EXPOSURE,
     MANUAL_GAIN,
     TARGET_TAG_ID,
@@ -32,22 +34,10 @@ RECORD_HZ = 60.0
 SHOW_CAMERA_FEED = False
 SHOW_FREQUENCY_CHECK = False
 RAWDATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rawdata")
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 MANUAL_RIGHT_RUDDER_PWM = 2000
-MANUAL_UP_PROP_PWM = 1650
+MANUAL_UP_PROP_PWM = 1675
 
-INTRINSICS_PATH = os.path.join(
-    SCRIPT_DIR,
-    "calibration",
-    "calibration_images_april21",
-    "calibration_intrinsics_april21.yaml",
-)
-EXTRINSICS_PATH = os.path.join(
-    SCRIPT_DIR,
-    "calibration",
-    "calibration_extrinsics_april21.yaml",
-)
 ARUCO_DICT = cv2.aruco.DICT_6X6_250
 WORLD_PLANE_Z = 0.0
 
@@ -283,7 +273,7 @@ def tracker_loop():
 
     if SHOW_CAMERA_FEED:
         cv2.namedWindow("Tracker", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Tracker", 1280, 720)
+        cv2.resizeWindow("Tracker", 1280, 960)
     print(f"[TRACKER] Tracking tag id {TARGET_TAG_ID}.")
 
     while running:
