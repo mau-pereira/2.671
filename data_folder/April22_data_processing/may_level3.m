@@ -19,6 +19,8 @@ close all; clc;
 scriptDir = fileparts(mfilename('fullpath'));
 dataDir = fullfile(scriptDir, 'rawdata_all_data');
 addpath(fullfile(scriptDir, '..', 'MyFunctions'));
+exportCfg = makeFigureExportConfig(scriptDir);
+exportMayLevel3Png = false;
 
 %% Load n4sid model from bundle (written by plot_n4sid_real_vs_pred_all_rawdata.m) or identify here
 % Set true after running plot_n4sid_real_vs_pred_all_rawdata.m once with exportMayLevel3N4sidBundle = true.
@@ -168,14 +170,23 @@ if isempty(rows)
 end
 
 %% Four figures: rudder 1775 vs 2000; thrust x = 25 / 30 / 35 (percent)
-plotRmseDualRudderFigure(rows, 'A', 'speed', 'Acceleration Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
-plotRmseDualRudderFigure(rows, 'A', 'yaw', 'Acceleration Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
-plotRmseDualRudderFigure(rows, 'B', 'speed', 'Turning Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
-plotRmseDualRudderFigure(rows, 'B', 'yaw', 'Turning Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
-createMayLevel3LegendFigure();
+figSpeedA = plotRmseDualRudderFigure(rows, 'A', 'speed', 'Acceleration Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
+figYawA   = plotRmseDualRudderFigure(rows, 'A', 'yaw',   'Acceleration Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
+figSpeedB = plotRmseDualRudderFigure(rows, 'B', 'speed', 'Turning Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
+figYawB   = plotRmseDualRudderFigure(rows, 'B', 'yaw',   'Turning Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
+figLegend = createMayLevel3LegendFigure();
+
+%% Export figures to data_folder/processed_data (similar style to plot_n4sid_real_vs_pred_all_rawdata.m)
+if exportMayLevel3Png
+    exportFigurePng(figSpeedA, fullfile(exportCfg.outDir, 'level3_rmse_speed_acceleration.png'), exportCfg);
+    exportFigurePng(figYawA,   fullfile(exportCfg.outDir, 'level3_rmse_yaw_acceleration.png'), exportCfg);
+    exportFigurePng(figSpeedB, fullfile(exportCfg.outDir, 'level3_rmse_speed_turning.png'), exportCfg);
+    exportFigurePng(figYawB,   fullfile(exportCfg.outDir, 'level3_rmse_yaw_turning.png'), exportCfg);
+    exportFigurePng(figLegend, fullfile(exportCfg.outDir, 'level3_legend.png'), exportCfg);
+end
 
 %% ---------- local helpers ----------
-function plotRmseDualRudderFigure(rows, regimeLetter, outputName, regimeTitle, propPctTargets, propPctSnapHalfWidth)
+function fig = plotRmseDualRudderFigure(rows, regimeLetter, outputName, regimeTitle, propPctTargets, propPctSnapHalfWidth)
 % One axes: RMSE vs prop (percent) for rudder PWM 1775 and 2000 (no legend).
 % propPctTargets e.g. [25,30,35]; mean and CI only at these thrust levels.
 if nargin < 5 || isempty(propPctTargets)
@@ -218,7 +229,7 @@ for ir = 1:numel(rudList)
     anyPlotted = true;
     c = cols{ir};
     ciLs = ciLineStyles{ir};
-    plotOlsLineOnAxes(ax, xs, ys, c, 2.2);
+    plotOlsLineOnAxes(ax, xs, ys, c, 6.8);
     plotAllTrialRmsePoints(ax, xs, ys, c);
     plotGroupedRmseWithMeanCi(ax, xs, ys, c, propPctTargets, propPctSnapHalfWidth, ciLs);
 end
@@ -228,17 +239,16 @@ if ~anyPlotted
 end
 xlabel(ax, 'Propeller Thrust (%)');
 ylabel(ax, yLabelTxt);
-title(ax, sprintf('%s | %s (rudder 1775 \\approx 22^\\circ, 2000 \\approx 40^\\circ)', regimeTitle, cap), ...
-    'Interpreter', 'tex');
+title(ax, regimeTitle, 'Interpreter', 'none');
 grid(ax, 'off');
 set(ax, 'XTick', propPctTargets, 'XTickLabel', compose('%.0f', propPctTargets));
-xlim(ax, [min(propPctTargets) - 2.5, max(propPctTargets) + 2.5]);
+xlim(ax, [min(propPctTargets) - 0.4, max(propPctTargets) + 0.4]);
 axes(ax); %#ok<LAXES>
 improvePlot();
 applyPosterAxisFonts(ax);
 end
 
-function createMayLevel3LegendFigure()
+function figLegend = createMayLevel3LegendFigure()
 % Standalone legend figure (single legend for all may_level3 plots).
 cols = {
     [0.00, 0.62, 0.27]  % 22 deg -> green
@@ -277,7 +287,7 @@ if isempty(xs)
     return;
 end
 ec = 0.35 * c + 0.65 * [0, 0, 0];
-plot(ax, xs, ys, 'o', 'MarkerSize', 14, 'LineWidth', 1.1, ...
+plot(ax, xs, ys, 'o', 'MarkerSize', 21, 'LineWidth', 1.1, ...
     'MarkerFaceColor', c, 'MarkerEdgeColor', ec, 'Color', c, ...
     'HandleVisibility', 'off');
 end
@@ -337,13 +347,13 @@ for ti = 1:numel(propPctTargets)
     lo = mu - errBar;
     hi = mu + errBar;
     % Draw CI manually so LineStyle (solid vs dashed) is obvious — MATLAB errorbar often ignores it.
-    capHalfW = 0.22;
-    ciLw = 2.4;
+    capHalfW = 0.45;
+    ciLw = 4.0;
     plot(ax, [t, t], [lo, hi], 'LineStyle', ciLineStyle, 'Color', c, 'LineWidth', ciLw, ...
         'HandleVisibility', 'off');
-    plot(ax, [t - capHalfW, t + capHalfW], [hi, hi], 'LineStyle', ciLineStyle, 'Color', c, ...
+    plot(ax, [t - capHalfW, t + capHalfW], [hi, hi], 'LineStyle', '-', 'Color', c, ...
         'LineWidth', ciLw, 'HandleVisibility', 'off');
-    plot(ax, [t - capHalfW, t + capHalfW], [lo, lo], 'LineStyle', ciLineStyle, 'Color', c, ...
+    plot(ax, [t - capHalfW, t + capHalfW], [lo, lo], 'LineStyle', '-', 'Color', c, ...
         'LineWidth', ciLw, 'HandleVisibility', 'off');
 end
 end
@@ -482,11 +492,12 @@ if nargin < 1 || isempty(fig) || ~ishandle(fig)
 end
 set(fig, 'Units', 'pixels');
 scr = get(0, 'ScreenSize');
-padLeftRight = 30;
 padTopBottom = 80;
-w = max(800, scr(3) - 2 * padLeftRight);
-h = max(500, scr(4) - 2 * padTopBottom);
-x = scr(1) + padLeftRight;
+heightFrac = 0.86;  % keep plots tall
+widthFrac = 0.62;   % narrower than full width for 3-column x-axis content
+w = max(800, floor(scr(3) * widthFrac));
+h = max(500, floor(scr(4) * heightFrac) - 2 * padTopBottom);
+x = scr(1) + floor((scr(3) - w) / 2);
 y = scr(2) + padTopBottom;
 set(fig, 'Position', [x, y, w, h]);
 end
@@ -777,4 +788,21 @@ unusedArgs = [maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
     settleAfterRegA_sec, circleRudderMinDeltaPwm, circleYawRateMinRadPerSec, circleMinSamples, ...
     mean(speed, 'omitnan'), mean(yawUnwrapped, 'omitnan')]; %#ok<NASGU>
 masks = struct('A', mA, 'B', mB);
+end
+
+function cfg = makeFigureExportConfig(scriptDir)
+cfg = struct();
+cfg.outDir = fullfile(scriptDir, '..', 'processed_data');
+if ~exist(cfg.outDir, 'dir')
+    mkdir(cfg.outDir);
+end
+cfg.exportResolution = 220;
+end
+
+function exportFigurePng(fig, outPath, cfg)
+set(fig, 'Color', 'w');
+drawnow;
+exportgraphics(fig, outPath, 'Resolution', cfg.exportResolution, ...
+    'ContentType', 'image', 'BackgroundColor', 'white');
+fprintf('Saved PNG: %s\n', outPath);
 end
