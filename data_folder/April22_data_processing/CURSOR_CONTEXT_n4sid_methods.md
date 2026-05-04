@@ -198,3 +198,48 @@ Console logs include per-file summary of \(r\) and \(U^B/U^V/U^C\) for speed and
 
 These are working observations and should be re-evaluated whenever identification file selection or preprocessing choices change.
 
+---
+
+## 11) Level 3 Transition Note (DO NOT EDIT)
+
+DO NOT EDIT.
+
+- I plan to answer **how much error** using:
+  - `data_folder/April22_data_processing/may_level3.m`
+- I was using:
+  - `data_folder/April22_data_processing/level3_plot.m`
+  to answer how error is categorized / where error comes from, but that script will be deprecated.
+- Going forward, both:
+  - "how much error" and
+  - "where the error comes from"
+  are answered in:
+  - `data_folder/April22_data_processing/may_level3.m`
+
+### What was implemented in this chat for `may_level3.m`
+
+- Uses Level-1/2-consistent identification style and Option B file list logic (with optional bundle loading from `may_level3_n4sid_bundle.mat`).
+- Uses only `rawdata_all_data` trials for Level 3 plots.
+- Computes regime-wise RMSE for:
+  - Speed (m/s),
+  - Yaw (degrees), with **yaw zero-referenced at trial start** for both real and predicted series before RMSE (removes inflated offset from IC mismatch).
+- Produces four Level 3 figures:
+  - Acceleration Test: speed RMSE vs thrust,
+  - Acceleration Test: yaw RMSE vs thrust,
+  - Turning Test: speed RMSE vs thrust,
+  - Turning Test: yaw RMSE vs thrust.
+- Overlays both rudder settings on each plot:
+  - 22° (green),
+  - 40° (magenta).
+- X-axis is fixed to three thrust levels (25, 30, 35), with trial points grouped by nearest target for CI aggregation.
+- Shows all trial points (solid circles), OLS trend lines, and 95% CI bars on grouped means.
+- Uses a standalone legend figure (single legend for all plots), not one legend per figure.
+- Plot labels include:
+  - X: `Propeller Thrust (%)`,
+  - Yaw units as `degrees` (not `deg`).
+- Optional PNG export to `processed_data` with filenames:
+  - `level3_rmse_speed_acceleration.png`
+  - `level3_rmse_yaw_acceleration.png`
+  - `level3_rmse_speed_turning.png`
+  - `level3_rmse_yaw_turning.png`
+  - `level3_legend.png`
+
