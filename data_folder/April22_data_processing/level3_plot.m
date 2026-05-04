@@ -29,7 +29,7 @@ cropEndTimeSec = 2.1;
 modelOrder = 2;
 
 %% Regime segmentation controls
-% Regime A: Rudder step transient (accelerate then decelerate window)
+% Acceleration Test segment (mask A): rudder step transient (accelerate then decelerate window)
 stepFromPwm = 1500;
 stepFromTol = 70;
 stepDeltaMinPwm = 120;   % catches 1500 -> 1775/2000 style steps
@@ -37,7 +37,7 @@ maxPeakSearchSec = 25;   % search for speed peak after step
 decelTailSec = 6;        % include post-peak decel tail
 regimeAMaxSec = 35;      % hard cap for transient window
 
-% Regime B: sustained circle
+% Turning Test segment (mask B): sustained circle
 settleAfterRegA_sec = 3;
 circleRudderMinDeltaPwm = 220; % |u_rudder_pwm - 1500| >= threshold
 circleYawRateMinRadPerSec = 0.08;
@@ -137,7 +137,7 @@ ylim([0 1]);
 grid off;
 improvePlot();
 axTheil = gca;
-set(axTheil, 'XTick', 1:4, 'XTickLabel', {'Regime A', 'Regime B', 'Regime A', 'Regime B'});
+set(axTheil, 'XTick', 1:4, 'XTickLabel', {'Acceleration Test', 'Turning Test', 'Acceleration Test', 'Turning Test'});
 yl = ylim(axTheil);
 yTxt = yl(1) - 0.08 * diff(yl);
 axFs = get(axTheil, 'FontSize');
@@ -296,11 +296,11 @@ i2 = min(n, stepIdx + peakSearchN);
 [~, relPk] = max(speed(stepIdx:i2));
 peakIdx = stepIdx + relPk - 1;
 
-% Regime A is pre-turn: from t=0 until turning onset.
+% Acceleration Test (mask A) is pre-turn: from t=0 until turning onset.
 regAEnd = max(1, stepIdx - 1);
 mA(1:regAEnd) = true;
 
-% Regime B is continuous: immediately after A until end of trial.
+% Turning Test (mask B) is continuous: immediately after A until end of trial.
 startB = min(n, regAEnd + 1);
 mB(startB:end) = true;
 
@@ -309,7 +309,7 @@ end
 
 function makePearsonOutputRegimeScatter(rows, outputName)
 % Pearson r vs propeller percent for one output (speed or yaw).
-% 4 series = (regime A/B) x (rudder 1775/2000). Regime A is red, Regime B is blue.
+% 4 series = (Acceleration/Turning Test) x (rudder 1775/2000). Acceleration Test is red, Turning Test is blue.
 fig = gcf;
 clf(fig);
 ax = axes('Parent', fig);
@@ -477,8 +477,8 @@ setFigureMaxSquareOnScreen(fig);
 end
 
 function theilOutputRegimeScatterOnAxes(ax, rows, outputName, theilIdx, compTex)
-% Scatter + linear fit on mean with CI; 4 series = (regime A/B) x (rudder 1775/2000).
-% Regime A is red, Regime B is blue; rudder is differentiated by marker/line style.
+% Scatter + linear fit on mean with CI; 4 series = (Acceleration/Turning Test) x (rudder 1775/2000).
+% Acceleration Test is red, Turning Test is blue; rudder is differentiated by marker/line style.
 cla(ax);
 propTicksPwm = [1625, 1650, 1675];
 propTicksPct = pwmToPropPercent(propTicksPwm);
@@ -1092,7 +1092,7 @@ yline(0, 'k:');
 xlabel('Lag (Samples)');
 ylabel('ACF');
 title(sprintf('%s residual ACF', upper(outputName)));
-legend({'Regime A', 'Regime B'}, 'Location', 'best');
+legend({'Acceleration Test', 'Turning Test'}, 'Location', 'best');
 grid off;
 end
 
@@ -1146,7 +1146,7 @@ yline(0, 'k:');
 xlabel('Lag (Samples)');
 ylabel('CCF');
 title(sprintf('%s residual-input CCF (vs rudder PWM)', upper(outputName)));
-legend({'Regime A', 'Regime B'}, 'Location', 'best');
+legend({'Acceleration Test', 'Turning Test'}, 'Location', 'best');
 grid off;
 end
 
@@ -1262,12 +1262,12 @@ nexttile;
 hold on;
 hSpdReal = plot(tPlot, speedReal, 'k-', 'LineWidth', 1.2);
 hSpdPred = plot(tPlot, speedPred, 'r--', 'LineWidth', 1.2);
-shadeRegimeBackground(gca, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60); % Regime A red-ish
-shadeRegimeBackground(gca, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60); % Regime B blue-ish
+shadeRegimeBackground(gca, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60); % Acceleration Test red-ish
+shadeRegimeBackground(gca, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60); % Turning Test blue-ish
 uistack([hSpdReal, hSpdPred], 'top');
 ylabel('Speed (m/s)');
 title(sprintf('%s | speed', trialName), 'Interpreter', 'none');
-legend({'Regime A', 'Regime B', 'Real', 'Predicted'}, 'Location', 'best');
+legend({'Acceleration Test', 'Turning Test', 'Real', 'Predicted'}, 'Location', 'best');
 grid off;
 hold off;
 
@@ -1282,7 +1282,7 @@ uistack([hYawReal, hYawPred], 'top');
 xlabel('Time (s)');
 ylabel('Yaw (Rad, Unwrapped)');
 title(sprintf('%s | yaw', trialName), 'Interpreter', 'none');
-legend({'Regime A', 'Regime B', 'Real', 'Predicted'}, 'Location', 'best');
+legend({'Acceleration Test', 'Turning Test', 'Real', 'Predicted'}, 'Location', 'best');
 grid off;
 hold off;
 

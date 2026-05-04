@@ -12,10 +12,10 @@ import cv2
 # User settings
 # ---------------------------------------------------------------------
 CAMERA_INDEX = 1
-DESIRED_WIDTH = 1920
-DESIRED_HEIGHT = 2160
+DESIRED_WIDTH = 1440
+DESIRED_HEIGHT = 1080
 DESIRED_FPS = 60
-PROBE_SECONDS = 3.0
+PROBE_SECONDS = 40
 
 
 def make_frequency_checker(label: str = "loop", print_every_s: float = 2.0):

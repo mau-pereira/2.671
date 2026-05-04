@@ -22,7 +22,7 @@ idUseAllExperimentCsvsInFolder = false;
 % Option A — exactly one identification file (full path, same style as
 % run_n4sid_from_april22_csv.m). When non-empty, Option B is ignored.
 % Use [] or '' when you want Option B instead (and Option C is false).
-idCsvPath = [];
+idCsvPath = [];%['C:\Users\M\OneDrive - Massachusetts Institute of Technology\00 - Spring 2026\2.671\2.671 Project\code\camera\data_folder\April22_data_processing\rawdata_all_data\prop1675rudder2000_3.csv'];
 
 % Option B — hand-pick any number of CSVs (same columns as the trial files).
 % Used when Option C is false and Option A is not used (idCsvPath is empty). Each string is either:
@@ -53,11 +53,12 @@ modelOrder = 2;
 
 %% Single validation trial (only this CSV is plotted)
 validationCsvFile = 'prop1650rudder2000_3.csv';
-plotRawOnly = true; % true: show only raw-data point plots (no lines), then stop.
+plotRawOnly = false; % true: show only raw-data point plots (no lines), then stop.
 plotAllRawXyInFolder = false; % true: plot X vs Y for every CSV in rawdata_all_data, then stop.
+plotAllTrials = false; % true: model-vs-real comparison for every CSV in dataDir; false: only validationCsvFile.
 rawXyFolder = fullfile(scriptDir, 'deprecated_processing_scripts', 'rawdata_april22');
 
-%% Regime segmentation controls (same style used in level3_plot.m)
+%% Regime segmentation (Acceleration Test / Turning Test; same style as level3_plot.m)
 stepFromPwm = 1500;
 stepFromTol = 70;
 stepDeltaMinPwm = 120;
@@ -68,6 +69,19 @@ settleAfterRegA_sec = 3;
 circleRudderMinDeltaPwm = 220;
 circleYawRateMinRadPerSec = 0.08;
 circleMinSamples = 40;
+
+%% Plot styling (fonts 3× MyFunctions/improvePlot.m tick/label; thick model/input time traces)
+plotLineWidthTimeSeries = 6.8;
+plotLineWidthLegendSwatches = 2.0; % Real/Predicted line icons in standalone legend only (thinner than plots)
+trajectoryAxisDisplaySpanM = 2; % X: x''=x_right−x; tick labels read 0..this (m) at left edge
+trajectoryYTickDisplayMinM = 0.5; % Y axis numbers only (world y stays data-snapped; else trajectory clips)
+trajectoryYTickDisplayMaxM = 2;
+rawPlotYPadFrac = 0.04; % Y-axis only: fraction of data span (raw trajectories + raw yaw)
+propThrustYAxisMaxPct = 30; % prop thrust Y ticks/limit include this percent (full scale)
+timeSeriesYTickTarget = 7; % speed & yaw (was 5 + 2)
+regimeShadeColorA = [1.0, 0.70, 0.70]; % regime A (Acceleration)
+regimeShadeColorB = [0.70, 0.80, 1.0]; % regime B (Turning)
+regimeShadeAlpha = 0.60;
 
 %% Raw-data-only mode: plot X vs Y for all CSVs in rawXyFolder, then exit
 if plotAllRawXyInFolder
@@ -91,8 +105,14 @@ if plotAllRawXyInFolder
         axis(axXY, 'equal');
         grid(axXY, 'on');
         improvePlot();
-        applyPaddedAxes(axXY, xRawAll, yRawAllPos);
+        xlim(axXY, [min(xRawAll), max(xRawAll)]);
+        ylim(axXY, [min(yRawAllPos), max(yRawAllPos)]);
+        set(axXY, 'XDir', 'normal', 'YDir', 'normal');
+        axis(axXY, 'equal');
         setEqualDivisionTicks(axXY);
+        setTrajectoryXYDisplayTicks(axXY, xRawAll, yRawAllPos, trajectoryAxisDisplaySpanM, ...
+            [], [], trajectoryYTickDisplayMinM, trajectoryYTickDisplayMaxM, rawPlotYPadFrac);
+        applyPosterAxisFonts(axXY);
     end
     return;
 end
@@ -127,8 +147,11 @@ csvPath = fullfile(dataDir, validationCsvFile);
 tRaw = tVal - tVal(1);
 xRaw = yVal(:, 1);
 yRaw = yVal(:, 2);
-yawRawDeg = rad2deg(yVal(:, 3));
 [speedRaw, yawRawUnwrapped] = buildProcessedOutputs(yVal, tVal);
+% Use unwrapped yaw (continuous, no sawtooth jumps) for the raw yaw plot.
+yawRawDeg = rad2deg(yawRawUnwrapped);
+% Zero at t=0 like real-vs-predicted yaw (same vertical offset convention).
+yawRawDegZeroed = yawRawDeg - yawRawDeg(1);
 masksRaw = makeRegimeMasks(uVal(:, 2), speedRaw, yawRawUnwrapped, tVal, ...
     stepFromPwm, stepFromTol, stepDeltaMinPwm, ...
     maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
@@ -166,14 +189,14 @@ setFigureFullScreen(figRawYaw);
 axRaw2 = axes('Parent', figRawYaw);
 hold(axRaw2, 'on');
 if any(masksRaw.A)
-    hRawA_yaw = scatter(axRaw2, tRaw(masksRaw.A), yawRawDeg(masksRaw.A), 10, 'o', ...
+    hRawA_yaw = scatter(axRaw2, tRaw(masksRaw.A), yawRawDegZeroed(masksRaw.A), 10, 'o', ...
         'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
 else
     hRawA_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
         'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
 end
 if any(masksRaw.B)
-    hRawB_yaw = scatter(axRaw2, tRaw(masksRaw.B), yawRawDeg(masksRaw.B), 10, 'o', ...
+    hRawB_yaw = scatter(axRaw2, tRaw(masksRaw.B), yawRawDegZeroed(masksRaw.B), 10, 'o', ...
         'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
 else
     hRawB_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
@@ -194,14 +217,23 @@ hLegA = scatter(axRawL, NaN, NaN, 10, 'o', ...
 hLegB = scatter(axRawL, NaN, NaN, 10, 'o', ...
     'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
 axis(axRawL, 'off');
-legend(axRawL, [hLegA, hLegB], {'Regime A', 'Regime B'}, ...
+legend(axRawL, [hLegA, hLegB], {'Acceleration Test', 'Turning Test'}, ...
     'Location', 'north', 'Interpreter', 'none', 'Box', 'on');
 improvePlot();
+setPosterLegendFontSize(figRawLegend);
+applyPosterAxisFonts(axRawL);
 hold(axRawL, 'off');
 
-applyPaddedAxesCustom(axRaw1, xRaw, yRaw, 0.04);
+xlim(axRaw1, [min(xRaw), max(xRaw)]);
+ylim(axRaw1, [min(yRaw), max(yRaw)]);
+set(axRaw1, 'XDir', 'normal', 'YDir', 'normal');
+axis(axRaw1, 'equal');
 setEqualDivisionTicks(axRaw1);
-applyPaddedAxes(axRaw2, tRaw, yawRawDeg);
+setTrajectoryXYDisplayTicks(axRaw1, xRaw, yRaw, trajectoryAxisDisplaySpanM, ...
+    [], [], trajectoryYTickDisplayMinM, trajectoryYTickDisplayMaxM, rawPlotYPadFrac);
+applyPaddedAxes(axRaw2, tRaw, yawRawDegZeroed);
+applyPosterAxisFonts([axRaw1; axRaw2]);
+sparseYTicks(axRaw2, timeSeriesYTickTarget);
 
 % Export raw-only figures to data_folder/processed_data
 rawExportDir = fullfile(scriptDir, '..', 'processed_data');
@@ -238,112 +270,259 @@ masks = makeRegimeMasks(uVal(:, 2), speedVal, yawValProc, tVal, ...
     settleAfterRegA_sec, circleRudderMinDeltaPwm, ...
     circleYawRateMinRadPerSec, circleMinSamples);
 
-figOutputs = figure('Name', sprintf('n4sid: %s (ID: %s)', validationCsvFile, idLabel), 'Color', 'w');
-setFigureFullScreen(figOutputs);
-tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+%% Build list of validation CSVs to compare against the model
+if plotAllTrials
+    valPathsLoop = listExperimentCsvPaths(dataDir);
+else
+    valPathsLoop = {fullfile(dataDir, validationCsvFile)};
+end
 
-nexttile;
-ax1 = gca;
-hold(ax1, 'on');
-hSpdReal = plot(ax1, tPlot, yValProc(:, 1), 'k-', 'LineWidth', 2.4);
-hSpdPred = plot(ax1, tPlot, yValSim(:, 1), 'k--', 'LineWidth', 2.4);
-shadeRegimeBackground(ax1, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
-shadeRegimeBackground(ax1, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
-uistack([hSpdReal, hSpdPred], 'top');
-ylabel('Speed (m/s)');
-% hRegA1 = patch(ax1, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% hRegB1 = patch(ax1, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% legend(ax1, [hSpdReal, hSpdPred, hRegA1, hRegB1], ...
-%     {'Real', 'Predicted', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
-grid(ax1, 'off');
-hold(ax1, 'off');
+%% One real-vs-predicted figure per validation trial
+for iVal = 1:numel(valPathsLoop)
+    csvPathLoop = valPathsLoop{iVal};
+    [~, valNameLoop, valExtLoop] = fileparts(csvPathLoop);
+    valLabelLoop = [valNameLoop, valExtLoop];
 
-nexttile;
-ax2 = gca;
-hold(ax2, 'on');
-hYawReal = plot(ax2, tPlot, yawRealWrappedDeg, 'k-', 'LineWidth', 2.4);
-hYawPred = plot(ax2, tPlot, yawPredWrappedDeg, 'k--', 'LineWidth', 2.4);
-shadeRegimeBackground(ax2, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
-shadeRegimeBackground(ax2, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
-uistack([hYawReal, hYawPred], 'top');
-xlabel('Time (s)');
-ylabel('Yaw (degrees)');
-% hRegA2 = patch(ax2, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% hRegB2 = patch(ax2, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% legend(ax2, [hYawReal, hYawPred, hRegA2, hRegB2], ...
-%     {'Real', 'Predicted', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
-grid(ax2, 'off');
-hold(ax2, 'off');
+    [uValL, yValL, tValL] = loadIoFromCsv(csvPathLoop);
+    [uValL, yValL, tValL] = cropSignalsToTime(uValL, yValL, tValL, cropEndTimeSec);
 
-improvePlot();
+    [uPropPctL, uRudderDegL] = buildProcessedInputs(uValL);
+    uValProcL = [uPropPctL, uRudderDegL];
+    [speedValL, yawValProcL] = buildProcessedOutputs(yValL, tValL);
+    yValProcL = [speedValL, yawValProcL];
 
-% Apply padding after improvePlot() so axis limits are not overwritten.
-applyPaddedAxes(ax1, tPlot, [yValProc(:, 1); yValSim(:, 1)]);
-applyPaddedAxes(ax2, tPlot, [yawRealWrappedDeg; yawPredWrappedDeg]);
+    zValL = iddata(yValProcL, uValProcL, Ts, ...
+        'InputName', {'u\_prop\_percent', 'u\_rudder\_deg'}, ...
+        'OutputName', {'speed', 'yaw'});
 
-%% Second figure: control inputs vs time (propeller % and rudder degrees)
-figInputs = figure('Name', sprintf('Inputs: %s', validationCsvFile), 'Color', 'w');
-setFigureFullScreen(figInputs);
-tiledlayout(2, 1, 'TileSpacing', 'compact', 'Padding', 'compact');
+    % Simulate from the default zero initial state. Speed is left as-is
+    % (the model was characterized around small/zero states, so x0 = 0
+    % gives the most reliable speed prediction). Yaw, on the other hand,
+    % behaves like a pure integrator state: any constant additive offset
+    % is dynamically harmless. We zero both the real and predicted yaw at
+    % t = 0 so the plot starts cleanly at 0 deg, while preserving the
+    % shape of each curve.
+    yValSimL = sim(sys, zValL.u);
+    tPlotL = tValL - tValL(1);
+    yawRealRad = yValProcL(:, 2);
+    yawPredRad = yValSimL(:, 2);
+    yawRealRadZeroed = yawRealRad - yawRealRad(1);
+    yawPredRadZeroed = yawPredRad - yawPredRad(1);
+    yawRealDegL = rad2deg(yawRealRadZeroed);
+    yawPredDegL = rad2deg(yawPredRadZeroed);
 
-nexttile;
-ax3 = gca;
+    masksL = makeRegimeMasks(uValL(:, 2), speedValL, yawValProcL, tValL, ...
+        stepFromPwm, stepFromTol, stepDeltaMinPwm, ...
+        maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
+        settleAfterRegA_sec, circleRudderMinDeltaPwm, ...
+        circleYawRateMinRadPerSec, circleMinSamples);
+
+    figSpeed = figure('Name', sprintf('Speed: %s (ID: %s)', valLabelLoop, idLabel), 'Color', 'w');
+    setFigureFullScreen(figSpeed);
+    ax1 = axes('Parent', figSpeed);
+    hold(ax1, 'on');
+    hSpdReal = plot(ax1, tPlotL, yValProcL(:, 1), 'k-', 'LineWidth', plotLineWidthTimeSeries);
+    hSpdPred = plot(ax1, tPlotL, yValSimL(:, 1), 'k--', 'LineWidth', plotLineWidthTimeSeries);
+    uistack([hSpdReal, hSpdPred], 'top');
+    xlabel(ax1, 'Time (s)');
+    ylabel(ax1, 'Speed (m/s)');
+    grid(ax1, 'off');
+    hold(ax1, 'off');
+
+    figYaw = figure('Name', sprintf('Yaw: %s (ID: %s)', valLabelLoop, idLabel), 'Color', 'w');
+    setFigureFullScreen(figYaw);
+    ax2 = axes('Parent', figYaw);
+    hold(ax2, 'on');
+    hYawReal = plot(ax2, tPlotL, yawRealDegL, 'k-', 'LineWidth', plotLineWidthTimeSeries);
+    hYawPred = plot(ax2, tPlotL, yawPredDegL, 'k--', 'LineWidth', plotLineWidthTimeSeries);
+    uistack([hYawReal, hYawPred], 'top');
+    xlabel(ax2, 'Time (s)');
+    ylabel(ax2, 'Yaw (degrees)');
+    grid(ax2, 'off');
+    hold(ax2, 'off');
+
+    figure(figSpeed);
+    improvePlot();
+    figure(figYaw);
+    improvePlot();
+
+    % Apply padding after improvePlot(), then regime shading so patches span full ylim.
+    applyPaddedAxes(ax1, tPlotL, [yValProcL(:, 1); yValSimL(:, 1)]);
+    shadeRegimeBackground(ax1, tPlotL, masksL.A, regimeShadeColorA, regimeShadeAlpha);
+    shadeRegimeBackground(ax1, tPlotL, masksL.B, regimeShadeColorB, regimeShadeAlpha);
+    uistack([hSpdReal, hSpdPred], 'top');
+    applyPosterAxisFonts(ax1);
+    sparseYTicks(ax1, timeSeriesYTickTarget);
+
+    applyPaddedAxes(ax2, tPlotL, [yawRealDegL; yawPredDegL]);
+    shadeRegimeBackground(ax2, tPlotL, masksL.A, regimeShadeColorA, regimeShadeAlpha);
+    shadeRegimeBackground(ax2, tPlotL, masksL.B, regimeShadeColorB, regimeShadeAlpha);
+    uistack([hYawReal, hYawPred], 'top');
+    applyPosterAxisFonts(ax2);
+    sparseYTicks(ax2, timeSeriesYTickTarget);
+
+    % Trajectory XY stats only (path plot is raw section level1_trajectory, not a separate figure).
+    xRawL = yValL(:, 1);
+    yRawL = yValL(:, 2);
+    xMinL = min(xRawL); xMaxL = max(xRawL);
+    yMinL = min(yRawL); yMaxL = max(yRawL);
+    xSpanL = xMaxL - xMinL;
+    ySpanL = yMaxL - yMinL;
+    fprintf(['Trajectory %s | X range = [%.3f, %.3f] m (span %.3f m), ', ...
+        'Y range = [%.3f, %.3f] m (span %.3f m), span ratio Y/X = %.3f\n'], ...
+        valLabelLoop, xMinL, xMaxL, xSpanL, yMinL, yMaxL, ySpanL, ...
+        ySpanL / max(xSpanL, eps));
+end
+
+%% Inputs vs time (separate figures: prop thrust %, prop angle)
+figPropThrust = figure('Name', sprintf('Prop thrust %%: %s', validationCsvFile), 'Color', 'w');
+setFigureFullScreen(figPropThrust);
+ax3 = axes('Parent', figPropThrust);
 hold(ax3, 'on');
-hPropCmd = plot(ax3, tPlot, uPropPctVal, 'k-', 'LineWidth', 2.4);
-shadeRegimeBackground(ax3, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
-shadeRegimeBackground(ax3, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
+hPropCmd = plot(ax3, tPlot, uPropPctVal, 'k-', 'LineWidth', plotLineWidthTimeSeries);
 uistack(hPropCmd, 'top');
-ylabel('Propeller Thrust (%)');
-% hRegA3 = patch(ax3, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% hRegB3 = patch(ax3, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% legend(ax3, [hPropCmd, hRegA3, hRegB3], ...
-%     {'Command', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
+xlabel(ax3, 'Time (s)');
+ylabel(ax3, 'Propeller Thrust (%)');
 grid(ax3, 'off');
 hold(ax3, 'off');
 
-nexttile;
-ax4 = gca;
+figPropAngle = figure('Name', sprintf('Prop angle: %s', validationCsvFile), 'Color', 'w');
+setFigureFullScreen(figPropAngle);
+ax4 = axes('Parent', figPropAngle);
 hold(ax4, 'on');
-hRudCmd = plot(ax4, tPlot, uRudderDegVal, 'k-', 'LineWidth', 2.4);
-shadeRegimeBackground(ax4, tPlot, masks.A, [1.0, 0.70, 0.70], 0.60);
-shadeRegimeBackground(ax4, tPlot, masks.B, [0.70, 0.80, 1.0], 0.60);
+hRudCmd = plot(ax4, tPlot, uRudderDegVal, 'k-', 'LineWidth', plotLineWidthTimeSeries);
 uistack(hRudCmd, 'top');
-xlabel('Time (s)');
-ylabel('Propeller Angle (degrees)');
-% hRegA4 = patch(ax4, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% hRegB4 = patch(ax4, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-% legend(ax4, [hRudCmd, hRegA4, hRegB4], ...
-%     {'Command', 'Regime A', 'Regime B'}, 'Location', 'eastoutside');
+xlabel(ax4, 'Time (s)');
+ylabel(ax4, 'Propeller Angle (degrees)');
 grid(ax4, 'off');
 hold(ax4, 'off');
 
+figure(figPropThrust);
+improvePlot();
+figure(figPropAngle);
 improvePlot();
 
 % Apply padding after improvePlot() so axis limits are not overwritten.
-applyPaddedAxes(ax3, tPlot, uPropPctVal);
-applyPaddedAxes(ax4, tPlot, uRudderDegVal);
+% Prop thrust: Y padding like applyPaddedAxes (18% of data span); yTop at least 30 percent; YTick 0, 15, 30.
+xMinT = min(tPlot(:)); xMaxT = max(tPlot(:));
+xSpanT = max(eps, xMaxT - xMinT);
+xPadT = 0.02 * xSpanT;
+xlim(ax3, [xMinT - xPadT, xMaxT + xPadT]);
+yMinP = min(uPropPctVal(:));
+yMaxP = max(uPropPctVal(:));
+ySpanP = max(eps, yMaxP - yMinP);
+yPadP = 0.18 * ySpanP;
+yBotP = min(yMinP - yPadP, 0);
+yTopP = max(propThrustYAxisMaxPct, yMaxP + yPadP);
+ylim(ax3, [yBotP, yTopP]);
+set(ax3, 'YTick', [0, 15, propThrustYAxisMaxPct]);
+shadeRegimeBackground(ax3, tPlot, masks.A, regimeShadeColorA, regimeShadeAlpha);
+shadeRegimeBackground(ax3, tPlot, masks.B, regimeShadeColorB, regimeShadeAlpha);
+uistack(hPropCmd, 'top');
+applyPosterAxisFonts(ax3);
 
-%% Standalone legend figure (Real / Predicted / Regime A / Regime B)
+applyPaddedAxes(ax4, tPlot, uRudderDegVal);
+shadeRegimeBackground(ax4, tPlot, masks.A, regimeShadeColorA, regimeShadeAlpha);
+shadeRegimeBackground(ax4, tPlot, masks.B, regimeShadeColorB, regimeShadeAlpha);
+uistack(hRudCmd, 'top');
+applyPosterAxisFonts(ax4);
+sparseYTicks(ax4, 5);
+
+%% Standalone legend figure (Real / Predicted / Acceleration Test / Turning Test)
 figLegend = figure('Name', 'Legend (real vs predicted)', 'Color', 'w');
 axL = axes('Parent', figLegend);
 hold(axL, 'on');
-hLegReal  = plot(axL, NaN, NaN, 'k-',  'LineWidth', 2.4);
-hLegPred  = plot(axL, NaN, NaN, 'k--', 'LineWidth', 2.4);
-hLegRegA  = patch(axL, NaN, NaN, [1.0, 0.70, 0.70], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
-hLegRegB  = patch(axL, NaN, NaN, [0.70, 0.80, 1.0], 'EdgeColor', 'none', 'FaceAlpha', 0.60);
+hLegReal  = plot(axL, NaN, NaN, 'k-',  'LineWidth', plotLineWidthLegendSwatches);
+hLegPred  = plot(axL, NaN, NaN, 'k--', 'LineWidth', plotLineWidthLegendSwatches);
+hLegRegA  = patch(axL, NaN, NaN, regimeShadeColorA, 'EdgeColor', 'none', 'FaceAlpha', regimeShadeAlpha);
+hLegRegB  = patch(axL, NaN, NaN, regimeShadeColorB, 'EdgeColor', 'none', 'FaceAlpha', regimeShadeAlpha);
 axis(axL, 'off');
 lgd = legend(axL, [hLegReal, hLegPred, hLegRegA, hLegRegB], ...
-    {'Real', 'Predicted', 'Regime A', 'Regime B'}, ...
+    {'Real', 'Predicted', 'Acceleration Test', 'Turning Test'}, ...
     'Orientation', 'vertical', 'Location', 'north', 'Box', 'on');
-set(lgd, 'FontSize', 16);
 improvePlot();
+setPosterLegendFontSize(figLegend);
+applyPosterAxisFonts(axL);
 
 %% Export figures to processed_data
-% exportFigurePng(figOutputs, fullfile(exportCfg.outDir, 'level1_2_outputs_and_validation.png'), exportCfg);
-% exportFigurePng(figInputs,  fullfile(exportCfg.outDir, 'level1_2_inputs.png'), exportCfg);
-% exportFigurePng(figLegend,  fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
+exportFigurePng(figSpeed, fullfile(exportCfg.outDir, 'level1_2_speed_vs_time.png'), exportCfg);
+exportFigurePng(figYaw, fullfile(exportCfg.outDir, 'level1_2_yaw_vs_time.png'), exportCfg);
+exportFigurePng(figPropThrust, fullfile(exportCfg.outDir, 'level1_2_prop_thrust_vs_time.png'), exportCfg);
+exportFigurePng(figPropAngle, fullfile(exportCfg.outDir, 'level1_2_prop_angle_vs_time.png'), exportCfg);
+exportFigurePng(figLegend, fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
 
 %% --- Local functions -------------------------------------------------
+
+function applyPosterAxisFonts(axh)
+% Tick and axis-label fonts: 3× improvePlot defaults (2× then 1.5×): PC 54/54, Mac 72/72.
+if ismac
+    tickFs = 72;
+    lblFs = 72;
+else
+    tickFs = 54;
+    lblFs = 54;
+end
+axh = axh(:);
+for i = 1:numel(axh)
+    ax = axh(i);
+    if isempty(ax) || ~isgraphics(ax)
+        continue;
+    end
+    set(ax, 'FontSize', tickFs, 'FontName', 'Arial');
+    xl = get(ax, 'XLabel');
+    yl = get(ax, 'YLabel');
+    if isgraphics(xl)
+        set(xl, 'FontSize', lblFs, 'FontWeight', 'bold');
+    end
+    if isgraphics(yl)
+        set(yl, 'FontSize', lblFs, 'FontWeight', 'bold');
+    end
+end
+end
+
+function setPosterLegendFontSize(fig)
+% Legend text only: same as data_folder/MyFunctions/improvePlot.m (axis fonts stay larger).
+if nargin < 1 || isempty(fig) || ~isgraphics(fig)
+    fig = gcf;
+end
+hLeg = findall(fig, 'Type', 'legend');
+if isempty(hLeg)
+    return;
+end
+if ismac
+    fs = 20;
+else
+    fs = 16;
+end
+set(hLeg, 'FontSize', fs);
+end
+
+function sparseYTicks(ax, nTarget)
+% Reduce Y tick count after ylim is final; uses niceTickStep in this file.
+if isempty(ax) || ~isgraphics(ax)
+    return;
+end
+nTarget = max(3, min(10, double(nTarget)));
+yl = ylim(ax);
+span = max(eps, yl(2) - yl(1));
+step = niceTickStep(span / max(nTarget - 1, 1));
+if ~isfinite(step) || step <= 0
+    return;
+end
+v1 = ceil(yl(1) / step - 1e-9) * step;
+v2 = floor(yl(2) / step + 1e-9) * step;
+yt = v1:step:v2;
+if isempty(yt)
+    return;
+end
+if numel(yt) > nTarget
+    ix = unique(round(linspace(1, numel(yt), nTarget)));
+    yt = yt(ix);
+end
+if numel(yt) >= 2
+    yticks(ax, yt);
+end
+end
 
 function pct = percentErrorPaperStyle(yHat, y, yFloor)
 % Paper-style estimation error (%): 100 * abs(yHat - y) ./ abs(y).
@@ -417,6 +596,7 @@ lgd = legend(ax, [hReal, hPred, hTxt1, hTxt2, hTxt3, hTxt4], { ...
     'Interpreter', 'tex', ...
     'Box', 'on');
 lgd.AutoUpdate = 'off';
+setPosterLegendFontSize(ancestor(ax, 'figure'));
 end
 
 function p = theilMseProportions(y, yHat, r)
@@ -813,6 +993,7 @@ masks = struct('A', mA, 'B', mB);
 end
 
 function shadeRegimeBackground(ax, tPlot, mask, colorRgb, alphaVal)
+% Vertical extent follows current ylim(ax) — call after applyPaddedAxes / ylim are final.
 if ~any(mask)
     return;
 end
@@ -863,6 +1044,95 @@ yMax = max(yVals);
 ySpan = max(eps, yMax - yMin);
 yPad = padFrac * ySpan;
 ylim(ax, [yMin - yPad, yMax + yPad]);
+end
+
+function setTrajectoryXYDisplayTicks(ax, xVals, yVals, labelSpanM, yLimMinM, yLimMaxM, yTickDispMinM, yTickDispMaxM, yPadFrac)
+% World X,Y data unchanged. Snap X limits to centimeters; 5 ticks per axis.
+% X labels: x'' = x_right - x (0 at right).
+% Y: world ylim = data min/max plus yPadFrac * span (0 = tight to data).
+% Y tick labels: optional affine map (yTickDispMinM,yTickDispMaxM) bottom→min top→max.
+% Optional yLimMinM, yLimMaxM: fixed world ylim ONLY when [min(y),max(y)] lies inside; else [].
+if isempty(ax) || ~isgraphics(ax) || isempty(xVals) || isempty(yVals)
+    return;
+end
+if nargin < 4 || isempty(labelSpanM)
+    labelSpanM = 2;
+end
+if nargin < 9 || isempty(yPadFrac) || ~isfinite(yPadFrac) || yPadFrac < 0
+    yPadFrac = 0;
+end
+hasYLimArgs = nargin >= 6 && ~isempty(yLimMinM) && ~isempty(yLimMaxM) && ...
+    isscalar(yLimMinM) && isscalar(yLimMaxM) && isfinite(yLimMinM) && isfinite(yLimMaxM) && yLimMaxM > yLimMinM;
+hasAffineYTicks = nargin >= 8 && ~isempty(yTickDispMinM) && ~isempty(yTickDispMaxM) && ...
+    isscalar(yTickDispMinM) && isscalar(yTickDispMaxM) && isfinite(yTickDispMinM) && ...
+    isfinite(yTickDispMaxM) && yTickDispMaxM > yTickDispMinM;
+xl = xlim(ax);
+xMinD = min(xVals(:));
+xMaxD = max(xVals(:));
+yMinD = min(yVals(:));
+yMaxD = max(yVals(:));
+b = ceil(max(xl(2), xMaxD) * 100) / 100;
+a = b - labelSpanM;
+if a > min(xl(1), xMinD) - 1e-9
+    a = floor(min(xl(1), xMinD) * 100) / 100;
+    b = a + labelSpanM;
+    if b < max(xl(2), xMaxD) - 1e-9
+        b = ceil(max(xl(2), xMaxD) * 100) / 100;
+        a = b - labelSpanM;
+    end
+end
+useFixedY = hasYLimArgs && yMinD >= yLimMinM - 1e-9 && yMaxD <= yLimMaxM + 1e-9;
+if hasYLimArgs && ~useFixedY
+    fprintf(['[trajectory XY] fixed ylim [%.4f, %.4f] m skipped; data Y in [%.4f, %.4f] m ', ...
+        '(using snapped limits).\n'], yLimMinM, yLimMaxM, yMinD, yMaxD);
+end
+if useFixedY
+    c = yLimMinM;
+    d = yLimMaxM;
+else
+    ySpanD = max(eps, yMaxD - yMinD);
+    padY = yPadFrac * ySpanD;
+    c = floor((yMinD - padY) * 100) / 100;
+    d = ceil((yMaxD + padY) * 100) / 100;
+    if d <= c + 1e-12
+        d = c + 0.05;
+    end
+end
+xlim(ax, [a, b]);
+ylim(ax, [c, d]);
+nTick = 5;
+xt = linspace(a, b, nTick);
+xlabs = arrayfun(@(v) sprintf('%g', b - v), xt, 'UniformOutput', false);
+if hasAffineYTicks
+    % Four ticks so displayed labels are exactly 0.5, 1, 1.5, 2 (not five uneven decimals).
+    nYTick = 4;
+    yt = linspace(c, d, nYTick);
+    yDispVals = linspace(yTickDispMinM, yTickDispMaxM, nYTick);
+    ylabs = arrayfun(@(t) sprintf('%g', t), yDispVals, 'UniformOutput', false);
+else
+    yt = linspace(c, d, nTick);
+    ylabs = arrayfun(@(v) sprintf('%g', v - c), yt, 'UniformOutput', false);
+end
+set(ax, 'XTick', xt, 'XTickLabel', xlabs, ...
+    'YTick', yt, 'YTickLabel', ylabs, ...
+    'XDir', 'normal', 'YDir', 'normal');
+daspect(ax, [1, 1, 1]);
+pbaspect(ax, 'auto');
+axis(ax, 'equal');
+ySpanDisp = d - c;
+if hasAffineYTicks
+    fprintf(['[trajectory XY] world xlim=[%.4f, %.4f] m ylim=[%.4f, %.4f] m | ', ...
+        'x'''' labels (m): %s | Y tick numbers (m): %s | X: right=%.4f→0 left=%.4f→%.4f | ', ...
+        'Y affine: bottom=%.4f→%.4f top=%.4f→%.4f\n'], ...
+        a, b, c, d, sprintf('%s, ', xlabs{:}), sprintf('%s, ', ylabs{:}), ...
+        b, a, labelSpanM, c, yTickDispMinM, d, yTickDispMaxM);
+else
+    fprintf(['[trajectory XY] world xlim=[%.4f, %.4f] m ylim=[%.4f, %.4f] m | ', ...
+        'x'''' labels (m): %s | y'''' labels (m): %s | X: right=%.4f→0 left=%.4f→%.4f | ', ...
+        'Y: bottom=%.4f→0 top=%.4f→%.4f\n'], ...
+        a, b, c, d, sprintf('%s, ', xlabs{:}), sprintf('%s, ', ylabs{:}), ...
+        b, a, labelSpanM, c, d, ySpanDisp);
+end
 end
 
 function setEqualDivisionTicks(ax)
