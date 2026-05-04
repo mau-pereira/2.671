@@ -51,8 +51,12 @@ legendNrmseMode = 'std';
 
 modelOrder = 2;
 
+% When true, writes may_level3_n4sid_bundle.mat next to this script so may_level3.m
+% can load the same sys/Ts without re-running n4sid.
+exportMayLevel3N4sidBundle = true;
+
 %% Single validation trial (only this CSV is plotted)
-validationCsvFile = 'prop1650rudder2000_3.csv';
+validationCsvFile = 'prop1650rudder2000_3.csv'; % must exist under rawdata_all_data (invalid_* lives under deprecated_processing_scripts)
 plotRawOnly = false; % true: show only raw-data point plots (no lines), then stop.
 plotAllRawXyInFolder = false; % true: plot X vs Y for every CSV in rawdata_all_data, then stop.
 plotAllTrials = false; % true: model-vs-real comparison for every CSV in dataDir; false: only validationCsvFile.
@@ -138,6 +142,12 @@ sys = n4sid(z, nx, 'Focus', 'simulation');
 disp(['Identification source: ', idLabel]);
 present(sys);
 
+if exportMayLevel3N4sidBundle
+    bundleFile = fullfile(scriptDir, 'may_level3_n4sid_bundle.mat');
+    save(bundleFile, 'sys', 'Ts', 'idLabel', 'cropEndTimeSec', 'modelOrder', '-v7.3');
+    fprintf('Saved n4sid bundle for may_level3.m: %s\n', bundleFile);
+end
+
 %% Single validation CSV: one figure, speed + yaw real vs prediction
 csvPath = fullfile(dataDir, validationCsvFile);
 [uVal, yVal, tVal] = loadIoFromCsv(csvPath);
@@ -149,9 +159,9 @@ xRaw = yVal(:, 1);
 yRaw = yVal(:, 2);
 [speedRaw, yawRawUnwrapped] = buildProcessedOutputs(yVal, tVal);
 % Use unwrapped yaw (continuous, no sawtooth jumps) for the raw yaw plot.
-yawRawDeg = rad2deg(yawRawUnwrapped);
+% yawRawDeg = rad2deg(yawRawUnwrapped);
 % Zero at t=0 like real-vs-predicted yaw (same vertical offset convention).
-yawRawDegZeroed = yawRawDeg - yawRawDeg(1);
+% yawRawDegZeroed = yawRawDeg - yawRawDeg(1);
 masksRaw = makeRegimeMasks(uVal(:, 2), speedRaw, yawRawUnwrapped, tVal, ...
     stepFromPwm, stepFromTol, stepDeltaMinPwm, ...
     maxPeakSearchSec, decelTailSec, regimeAMaxSec, ...
@@ -184,45 +194,45 @@ axes(axRaw1); %#ok<LAXES>
 improvePlot();
 hold(axRaw1, 'off');
 
-figRawYaw = figure('Name', sprintf('Raw Yaw vs Time: %s', validationCsvFile), 'Color', 'w');
-setFigureFullScreen(figRawYaw);
-axRaw2 = axes('Parent', figRawYaw);
-hold(axRaw2, 'on');
-if any(masksRaw.A)
-    hRawA_yaw = scatter(axRaw2, tRaw(masksRaw.A), yawRawDegZeroed(masksRaw.A), 10, 'o', ...
-        'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
-else
-    hRawA_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
-        'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
-end
-if any(masksRaw.B)
-    hRawB_yaw = scatter(axRaw2, tRaw(masksRaw.B), yawRawDegZeroed(masksRaw.B), 10, 'o', ...
-        'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
-else
-    hRawB_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
-        'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
-end
-xlabel(axRaw2, 'Time (s)');
-ylabel(axRaw2, 'Yaw (degrees)');
-grid(axRaw2, 'off');
-axes(axRaw2); %#ok<LAXES>
-improvePlot();
-hold(axRaw2, 'off');
+% figRawYaw = figure('Name', sprintf('Raw Yaw vs Time: %s', validationCsvFile), 'Color', 'w');
+% setFigureFullScreen(figRawYaw);
+% axRaw2 = axes('Parent', figRawYaw);
+% hold(axRaw2, 'on');
+% if any(masksRaw.A)
+%     hRawA_yaw = scatter(axRaw2, tRaw(masksRaw.A), yawRawDegZeroed(masksRaw.A), 10, 'o', ...
+%         'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+% else
+%     hRawA_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
+%         'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+% end
+% if any(masksRaw.B)
+%     hRawB_yaw = scatter(axRaw2, tRaw(masksRaw.B), yawRawDegZeroed(masksRaw.B), 10, 'o', ...
+%         'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+% else
+%     hRawB_yaw = scatter(axRaw2, NaN, NaN, 10, 'o', ...
+%         'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+% end
+% xlabel(axRaw2, 'Time (s)');
+% ylabel(axRaw2, 'Yaw (degrees)');
+% grid(axRaw2, 'off');
+% axes(axRaw2); %#ok<LAXES>
+% improvePlot();
+% hold(axRaw2, 'off');
 
-figRawLegend = figure('Name', sprintf('Legend: %s', validationCsvFile), 'Color', 'w');
-axRawL = axes('Parent', figRawLegend);
-hold(axRawL, 'on');
-hLegA = scatter(axRawL, NaN, NaN, 10, 'o', ...
-    'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
-hLegB = scatter(axRawL, NaN, NaN, 10, 'o', ...
-    'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
-axis(axRawL, 'off');
-legend(axRawL, [hLegA, hLegB], {'Acceleration Test', 'Turning Test'}, ...
-    'Location', 'north', 'Interpreter', 'none', 'Box', 'on');
-improvePlot();
-setPosterLegendFontSize(figRawLegend);
-applyPosterAxisFonts(axRawL);
-hold(axRawL, 'off');
+% figRawLegend = figure('Name', sprintf('Legend: %s', validationCsvFile), 'Color', 'w');
+% axRawL = axes('Parent', figRawLegend);
+% hold(axRawL, 'on');
+% hLegA = scatter(axRawL, NaN, NaN, 10, 'o', ...
+%     'MarkerEdgeColor', [0.88, 0.22, 0.18], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+% hLegB = scatter(axRawL, NaN, NaN, 10, 'o', ...
+%     'MarkerEdgeColor', [0.18, 0.42, 0.88], 'MarkerFaceColor', 'none', 'LineWidth', 0.7);
+% axis(axRawL, 'off');
+% legend(axRawL, [hLegA, hLegB], {'Acceleration Test', 'Turning Test'}, ...
+%     'Location', 'north', 'Interpreter', 'none', 'Box', 'on');
+% improvePlot();
+% setPosterLegendFontSize(figRawLegend);
+% applyPosterAxisFonts(axRawL);
+% hold(axRawL, 'off');
 
 xlim(axRaw1, [min(xRaw), max(xRaw)]);
 ylim(axRaw1, [min(yRaw), max(yRaw)]);
@@ -231,18 +241,18 @@ axis(axRaw1, 'equal');
 setEqualDivisionTicks(axRaw1);
 setTrajectoryXYDisplayTicks(axRaw1, xRaw, yRaw, trajectoryAxisDisplaySpanM, ...
     [], [], trajectoryYTickDisplayMinM, trajectoryYTickDisplayMaxM, rawPlotYPadFrac);
-applyPaddedAxes(axRaw2, tRaw, yawRawDegZeroed);
-applyPosterAxisFonts([axRaw1; axRaw2]);
-sparseYTicks(axRaw2, timeSeriesYTickTarget);
+% applyPaddedAxes(axRaw2, tRaw, yawRawDegZeroed);
+applyPosterAxisFonts(axRaw1);
+% sparseYTicks(axRaw2, timeSeriesYTickTarget);
 
 % Export raw-only figures to data_folder/processed_data
 rawExportDir = fullfile(scriptDir, '..', 'processed_data');
 if ~exist(rawExportDir, 'dir')
     mkdir(rawExportDir);
 end
-exportFigurePng(figRawXY, fullfile(rawExportDir, 'level1_trajectory.png'), exportCfg);
-exportFigurePng(figRawYaw, fullfile(rawExportDir, 'level1_yaw.png'), exportCfg);
-exportFigurePng(figRawLegend, fullfile(rawExportDir, 'level1_legened.png'), exportCfg);
+% exportFigurePng(figRawXY, fullfile(rawExportDir, 'level1_trajectory.png'), exportCfg);
+% exportFigurePng(figRawYaw, fullfile(rawExportDir, 'level1_yaw.png'), exportCfg);
+% exportFigurePng(figRawLegend, fullfile(rawExportDir, 'level1_legened.png'), exportCfg);
 
 if plotRawOnly
     return;
@@ -428,28 +438,28 @@ uistack(hRudCmd, 'top');
 applyPosterAxisFonts(ax4);
 sparseYTicks(ax4, 5);
 
-%% Standalone legend figure (Real / Predicted / Acceleration Test / Turning Test)
-figLegend = figure('Name', 'Legend (real vs predicted)', 'Color', 'w');
-axL = axes('Parent', figLegend);
-hold(axL, 'on');
-hLegReal  = plot(axL, NaN, NaN, 'k-',  'LineWidth', plotLineWidthLegendSwatches);
-hLegPred  = plot(axL, NaN, NaN, 'k--', 'LineWidth', plotLineWidthLegendSwatches);
-hLegRegA  = patch(axL, NaN, NaN, regimeShadeColorA, 'EdgeColor', 'none', 'FaceAlpha', regimeShadeAlpha);
-hLegRegB  = patch(axL, NaN, NaN, regimeShadeColorB, 'EdgeColor', 'none', 'FaceAlpha', regimeShadeAlpha);
-axis(axL, 'off');
-lgd = legend(axL, [hLegReal, hLegPred, hLegRegA, hLegRegB], ...
-    {'Real', 'Predicted', 'Acceleration Test', 'Turning Test'}, ...
-    'Orientation', 'vertical', 'Location', 'north', 'Box', 'on');
-improvePlot();
-setPosterLegendFontSize(figLegend);
-applyPosterAxisFonts(axL);
+% %% Standalone legend figure (Real / Predicted / Acceleration Test / Turning Test)
+% figLegend = figure('Name', 'Legend (real vs predicted)', 'Color', 'w');
+% axL = axes('Parent', figLegend);
+% hold(axL, 'on');
+% hLegReal  = plot(axL, NaN, NaN, 'k-',  'LineWidth', plotLineWidthLegendSwatches);
+% hLegPred  = plot(axL, NaN, NaN, 'k--', 'LineWidth', plotLineWidthLegendSwatches);
+% hLegRegA  = patch(axL, NaN, NaN, regimeShadeColorA, 'EdgeColor', 'none', 'FaceAlpha', regimeShadeAlpha);
+% hLegRegB  = patch(axL, NaN, NaN, regimeShadeColorB, 'EdgeColor', 'none', 'FaceAlpha', regimeShadeAlpha);
+% axis(axL, 'off');
+% lgd = legend(axL, [hLegReal, hLegPred, hLegRegA, hLegRegB], ...
+%     {'Real', 'Predicted', 'Acceleration Test', 'Turning Test'}, ...
+%     'Orientation', 'vertical', 'Location', 'north', 'Box', 'on');
+% improvePlot();
+% setPosterLegendFontSize(figLegend);
+% applyPosterAxisFonts(axL);
 
 %% Export figures to processed_data
-exportFigurePng(figSpeed, fullfile(exportCfg.outDir, 'level1_2_speed_vs_time.png'), exportCfg);
-exportFigurePng(figYaw, fullfile(exportCfg.outDir, 'level1_2_yaw_vs_time.png'), exportCfg);
-exportFigurePng(figPropThrust, fullfile(exportCfg.outDir, 'level1_2_prop_thrust_vs_time.png'), exportCfg);
-exportFigurePng(figPropAngle, fullfile(exportCfg.outDir, 'level1_2_prop_angle_vs_time.png'), exportCfg);
-exportFigurePng(figLegend, fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
+% exportFigurePng(figSpeed, fullfile(exportCfg.outDir, 'level1_2_speed_vs_time.png'), exportCfg);
+% exportFigurePng(figYaw, fullfile(exportCfg.outDir, 'level1_2_yaw_vs_time.png'), exportCfg);
+% exportFigurePng(figPropThrust, fullfile(exportCfg.outDir, 'level1_2_prop_thrust_vs_time.png'), exportCfg);
+% exportFigurePng(figPropAngle, fullfile(exportCfg.outDir, 'level1_2_prop_angle_vs_time.png'), exportCfg);
+% exportFigurePng(figLegend, fullfile(exportCfg.outDir, 'level1_2_legend.png'), exportCfg);
 
 %% --- Local functions -------------------------------------------------
 
@@ -585,18 +595,18 @@ hTxt2 = plot(ax, nan, nan, 'LineStyle', 'none', 'Marker', 'none', 'HandleVisibil
 hTxt3 = plot(ax, nan, nan, 'LineStyle', 'none', 'Marker', 'none', 'HandleVisibility', 'on');
 hTxt4 = plot(ax, nan, nan, 'LineStyle', 'none', 'Marker', 'none', 'HandleVisibility', 'on');
 
-lgd = legend(ax, [hReal, hPred, hTxt1, hTxt2, hTxt3, hTxt4], { ...
-    'Real', ...
-    'Predicted', ...
-    sprintf('r      %.3f', rVal), ...
-    sprintf('U^B   %.1f%%', 100 * theilRow(1)), ...
-    sprintf('U^V   %.1f%%', 100 * theilRow(2)), ...
-    sprintf('U^C   %.1f%%', 100 * theilRow(3))}, ...
-    'Location', 'southeast', ...
-    'Interpreter', 'tex', ...
-    'Box', 'on');
-lgd.AutoUpdate = 'off';
-setPosterLegendFontSize(ancestor(ax, 'figure'));
+% lgd = legend(ax, [hReal, hPred, hTxt1, hTxt2, hTxt3, hTxt4], { ...
+%     'Real', ...
+%     'Predicted', ...
+%     sprintf('r      %.3f', rVal), ...
+%     sprintf('U^B   %.1f%%', 100 * theilRow(1)), ...
+%     sprintf('U^V   %.1f%%', 100 * theilRow(2)), ...
+%     sprintf('U^C   %.1f%%', 100 * theilRow(3))}, ...
+%     'Location', 'southeast', ...
+%     'Interpreter', 'tex', ...
+%     'Box', 'on');
+% lgd.AutoUpdate = 'off';
+% setPosterLegendFontSize(ancestor(ax, 'figure'));
 end
 
 function p = theilMseProportions(y, yHat, r)
@@ -1187,9 +1197,9 @@ function exportFigurePng(fig, outPath, cfg)
 % Export the figure at its current on-screen aspect ratio (no forced square).
 set(fig, 'Color', 'w');
 drawnow;
-exportgraphics(fig, outPath, 'Resolution', cfg.exportResolution, ...
-    'ContentType', 'image', 'BackgroundColor', 'white');
-fprintf('Saved PNG: %s\n', outPath);
+% exportgraphics(fig, outPath, 'Resolution', cfg.exportResolution, ...
+%     'ContentType', 'image', 'BackgroundColor', 'white');
+% fprintf('Saved PNG: %s\n', outPath);
 end
 
 function setFigureFullScreen(fig)
