@@ -15,8 +15,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_RAWDATA_DIR = os.path.join(SCRIPT_DIR, "rawdata")
-DEFAULT_CSV = os.path.join(DEFAULT_RAWDATA_DIR, "prop1675rudder2000_1.csv")
+REPO_ROOT = os.path.dirname(SCRIPT_DIR)
+DEFAULT_RAWDATA_DIR = os.path.join(
+    REPO_ROOT, "data_folder", "April22_data_processing", "rawdata_all_data"
+)
+DEFAULT_CSV = os.path.join(DEFAULT_RAWDATA_DIR, "prop1650rudder1800_5.csv")
+PLOT_ALL_TRIALS = True  # True: load all CSVs in DEFAULT_RAWDATA_DIR when no CLI file/dir is given.
 
 
 def load_recording_csv(path: str) -> np.ndarray:
@@ -33,54 +37,49 @@ def load_recording_csv(path: str) -> np.ndarray:
 
 def plot_trajectories(paths: list[str]) -> None:
     paths = [os.path.normpath(p) for p in paths]
-    fig, ax = plt.subplots(figsize=(7, 7))
-
-    cmap = plt.get_cmap("tab10")
-    any_points = False
-
-    for i, path in enumerate(paths):
+    for path in paths:
         if not os.path.isfile(path):
             raise FileNotFoundError(path)
+
+        fig, ax = plt.subplots(figsize=(7, 7))
         data = load_recording_csv(path)
         x = data[:, 3]
         y = data[:, 4]
         m = np.isfinite(x) & np.isfinite(y)
         n_valid = int(np.sum(m))
         n_total = int(data.shape[0])
-        label = f"{os.path.basename(path)} ({n_valid}/{n_total} valid)"
-        color = cmap(i % 10)
         if np.any(m):
-            any_points = True
-            ax.plot(x[m], y[m], ".", markersize=4, color=color, label=label)
+            ax.plot(x[m], y[m], ".", markersize=4, color="k")
+            ax.set_aspect("equal", adjustable="box")
         else:
-            ax.plot([], [], "o", color=color, label=f"{os.path.basename(path)} (no valid xy)")
+            ax.text(
+                0.5,
+                0.5,
+                "No valid trajectory samples (finite x, y) in this file",
+                transform=ax.transAxes,
+                ha="center",
+                va="center",
+                color="red",
+            )
 
-    if any_points:
-        ax.set_aspect("equal", adjustable="box")
-    else:
-        ax.text(
-            0.5,
-            0.5,
-            "No valid trajectory samples (finite x, y) in given file(s)",
-            transform=ax.transAxes,
-            ha="center",
-            va="center",
-            color="red",
-        )
+        ax.set_xlabel("x world (m)")
+        ax.set_ylabel("y world (m)")
+        ax.set_title(f"Trajectory: {os.path.basename(path)} ({n_valid}/{n_total} valid)")
+        ax.grid(True)
+        fig.tight_layout()
 
-    ax.set_xlabel("x world (m)")
-    ax.set_ylabel("y world (m)")
-    ax.set_title("Trajectory from recording(s)")
-    ax.grid(True)
-    if len(paths) > 1:
-        ax.legend(loc="best", fontsize=8)
-    fig.tight_layout()
     plt.show()
 
 
 def _collect_paths(args: argparse.Namespace) -> list[str]:
     if args.files:
         return list(args.files)
+    if PLOT_ALL_TRIALS:
+        pattern = os.path.join(DEFAULT_RAWDATA_DIR, args.glob_pattern)
+        found = sorted(glob.glob(pattern))
+        if not found:
+            raise SystemExit(f"No files matched: {pattern}")
+        return found
     if args.dir:
         pattern = os.path.join(os.path.normpath(args.dir), args.glob_pattern)
         found = sorted(glob.glob(pattern))
@@ -99,7 +98,7 @@ def main():
         nargs="*",
         help=(
             "CSV file path(s). If omitted, uses the default example under "
-            "experiment_scripts/rawdata/ unless --dir is set."
+            "data_folder/April22_data_processing/rawdata_all_data/ unless --dir is set."
         ),
     )
     parser.add_argument(
