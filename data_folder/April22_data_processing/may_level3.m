@@ -3,7 +3,7 @@
 %   Thrust axis at 25, 30, 35 (percent; PWM 1625 / 1650 / 1675). Trials snap to nearest grid.
 %   At each level: mean RMSE with 95% CI if n>=2 (trials as solid circles).
 %   All per-trial points plotted (filled markers). OLS uses unsnapped x.
-%   Rudder PWM 1775 (~22 deg) vs 2000 (~40 deg).
+%   Rudder PWM 1800 (~24 deg) vs 2000 (~40 deg).
 %   (1) Acceleration | speed    (2) Acceleration | yaw
 %   (3) Turning      | speed    (4) Turning      | yaw
 % Yaw RMSE (deg): measured and predicted unwrapped yaw are zeroed at trial t=0 (like plot_n4sid).
@@ -24,18 +24,18 @@ exportMayLevel3Png = false;
 
 %% Load n4sid model from bundle (written by plot_n4sid_real_vs_pred_all_rawdata.m) or identify here
 % Set true after running plot_n4sid_real_vs_pred_all_rawdata.m once with exportMayLevel3N4sidBundle = true.
-useN4sidBundleFromFile = true;
+useN4sidBundleFromFile = false;
 n4sidBundleMatFile = fullfile(scriptDir, 'may_level3_n4sid_bundle.mat');
 
 %% Identification (Option B) — same defaults as plot_n4sid_real_vs_pred_all_rawdata.m
 idUseAllExperimentCsvsInFolder = false;
 idCsvPath = [];
 idCsvFiles = {
-    'prop1625rudder2000_1.csv'
-    'prop1650rudder2000_2.csv'
-    'prop1675rudder2000_3.csv'
-    'prop1625rudder1775_2.csv'
-    'prop1650rudder1775_1.csv'
+    'prop1625rudder1800_2.csv'
+    'prop1650rudder1800_4.csv'
+    'prop1675rudder1800_5.csv'
+
+    'prop1675rudder2000_1.csv'
     };
 
 cropEndTimeSec = 2.1;
@@ -115,7 +115,7 @@ for k = 1:numel(csvPaths)
     if ~isfinite(propPwm) || ~isfinite(rudderPwm)
         continue;
     end
-    if ~any(rudderPwm == [1775, 2000])
+    if ~any(rudderPwm == [1800, 2000])
         continue;
     end
 
@@ -169,7 +169,31 @@ if isempty(rows)
     error('may_level3: no trials produced RMSE rows. Check rawdata_all_data and filename pattern prop####rudder####.');
 end
 
-%% Four figures: rudder 1775 vs 2000; thrust x = 25 / 30 / 35 (percent)
+% Print Turning Test speed RMSE per trial (sorted by trial file name).
+turningSpeedRmse = [rows.rmse_speed_B].';
+trialNames = {rows.trial}.';
+propPwms = [rows.propPwm].';
+rudderPwms = [rows.rudderPwm].';
+okPrint = isfinite(turningSpeedRmse);
+if any(okPrint)
+    vals = turningSpeedRmse(okPrint);
+    names = trialNames(okPrint);
+    pvals = propPwms(okPrint);
+    rvals = rudderPwms(okPrint);
+    [names, ix] = sort(names);
+    valsSorted = vals(ix);
+    pvals = pvals(ix);
+    rvals = rvals(ix);
+    fprintf('\nmay_level3: Turning Test speed RMSE by trial (sorted by file name)\n');
+    fprintf('  RMSE(m/s) | propPWM | rudderPWM | trial\n');
+    for i = 1:numel(valsSorted)
+        fprintf('  %8.4f | %7d | %9d | %s\n', valsSorted(i), pvals(i), rvals(i), names{i});
+    end
+else
+    fprintf('\nmay_level3: no finite Turning Test speed RMSE values to print.\n');
+end
+
+%% Four figures: rudder 1800 vs 2000; thrust x = 25 / 30 / 35 (percent)
 figSpeedA = plotRmseDualRudderFigure(rows, 'A', 'speed', 'Acceleration Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
 figYawA   = plotRmseDualRudderFigure(rows, 'A', 'yaw',   'Acceleration Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
 figSpeedB = plotRmseDualRudderFigure(rows, 'B', 'speed', 'Turning Test', mayLevel3PropPctTargets, mayLevel3PropPctSnapHalfWidth);
@@ -187,7 +211,7 @@ end
 
 %% ---------- local helpers ----------
 function fig = plotRmseDualRudderFigure(rows, regimeLetter, outputName, regimeTitle, propPctTargets, propPctSnapHalfWidth)
-% One axes: RMSE vs prop (percent) for rudder PWM 1775 and 2000 (no legend).
+% One axes: RMSE vs prop (percent) for rudder PWM 1800 and 2000 (no legend).
 % propPctTargets e.g. [25,30,35]; mean and CI only at these thrust levels.
 if nargin < 5 || isempty(propPctTargets)
     propPctTargets = [25, 30, 35];
@@ -195,9 +219,9 @@ end
 if nargin < 6 || isempty(propPctSnapHalfWidth)
     propPctSnapHalfWidth = 0.6;
 end
-rudList = [1775, 2000];
+rudList = [1800, 2000];
 cols = {
-    [0.00, 0.62, 0.27]  % 22 deg -> green
+    [0.00, 0.62, 0.27]  % 24 deg -> green
     [0.86, 0.00, 0.86]  % 40 deg -> magenta
     };
 ciLineStyles = {'-', '--'}; % Option 2: distinguish overlapping CI bars by line style
@@ -216,7 +240,7 @@ else
     cap = 'Yaw';
 end
 
-fig = figure('Name', sprintf('may_level3: %s RMSE vs prop | %s | 1775+2000', cap, fldShort), 'Color', 'w');
+fig = figure('Name', sprintf('may_level3: %s RMSE vs prop | %s | 1800+2000', cap, fldShort), 'Color', 'w');
 setFigureFullScreen(fig);
 ax = axes('Parent', fig);
 hold(ax, 'on');
@@ -239,7 +263,6 @@ if ~anyPlotted
 end
 xlabel(ax, 'Propeller Thrust (%)');
 ylabel(ax, yLabelTxt);
-title(ax, regimeTitle, 'Interpreter', 'none');
 grid(ax, 'off');
 set(ax, 'XTick', propPctTargets, 'XTickLabel', compose('%.0f', propPctTargets));
 xlim(ax, [min(propPctTargets) - 0.4, max(propPctTargets) + 0.4]);
@@ -251,7 +274,7 @@ end
 function figLegend = createMayLevel3LegendFigure()
 % Standalone legend figure (single legend for all may_level3 plots).
 cols = {
-    [0.00, 0.62, 0.27]  % 22 deg -> green
+    [0.00, 0.62, 0.27]  % 24 deg -> green
     [0.86, 0.00, 0.86]  % 40 deg -> magenta
     };
 figLegend = figure('Name', 'may_level3 legend', 'Color', 'w');
@@ -270,7 +293,7 @@ hLegMagenta = line(axL, 'XData', NaN, 'YData', NaN, ...
     'MarkerSize', 14, 'LineWidth', 1.1, ...
     'MarkerFaceColor', cols{2}, 'MarkerEdgeColor', cols{2});
 legend(axL, [hLegGreen, hLegMagenta], ...
-    {'Propeller Angle 22^\circ', 'Propeller Angle 40^\circ'}, ...
+    {'Propeller Angle 24^\circ', 'Propeller Angle 40^\circ'}, ...
     'Orientation', 'vertical', 'Location', 'north', ...
     'Interpreter', 'tex', 'Box', 'on');
 hold(axL, 'off');
@@ -703,23 +726,36 @@ end
 end
 
 function [uOut, yOut, tOut] = cropSignalsToTime(u, y, t, cropEndTimeSec)
-if isempty(cropEndTimeSec)
-    uOut = u;
-    yOut = y;
-    tOut = t;
-    return;
+% End each segment when rudder command returns from turn (1800/2000 PWM) to
+% neutral (1500 PWM). If that transition is not found, fall back to the
+% legacy tail-trim behavior controlled by cropEndTimeSec.
+rudderPwm = u(:, 2);
+tolHigh = 15;
+tolNeutral = 15;
+isFromTurn = abs(rudderPwm(1:end-1) - 1800) <= tolHigh | abs(rudderPwm(1:end-1) - 2000) <= tolHigh;
+isToNeutral = abs(rudderPwm(2:end) - 1500) <= tolNeutral;
+transitionIdx = find(isFromTurn & isToNeutral, 1, 'first');
+
+if ~isempty(transitionIdx)
+    transitionTime = t(transitionIdx + 1);
+    cutoffTime = transitionTime - 0.25; % crop 0.25 s before return-to-neutral
+    keep = t <= cutoffTime;
+elseif isempty(cropEndTimeSec)
+    keep = true(size(t));
+else
+    if ~isfinite(cropEndTimeSec) || cropEndTimeSec <= 0
+        error('cropEndTimeSec must be a positive finite scalar or empty.');
+    end
+    tRel = t - t(1);
+    trialDurationSec = tRel(end);
+    if cropEndTimeSec >= trialDurationSec
+        error('cropEndTimeSec=%g is >= trial duration %g s.', cropEndTimeSec, trialDurationSec);
+    end
+    keep = tRel <= (trialDurationSec - cropEndTimeSec);
 end
-if ~isfinite(cropEndTimeSec) || cropEndTimeSec <= 0
-    error('cropEndTimeSec must be a positive finite scalar or empty.');
-end
-tRel = t - t(1);
-trialDurationSec = tRel(end);
-if cropEndTimeSec >= trialDurationSec
-    error('cropEndTimeSec=%g is >= trial duration %g s.', cropEndTimeSec, trialDurationSec);
-end
-keep = tRel <= (trialDurationSec - cropEndTimeSec);
+
 if nnz(keep) < 20
-    error('Tail trim keeps too few samples (%d). Decrease cropEndTimeSec.', nnz(keep));
+    error('Trim keeps too few samples (%d).', nnz(keep));
 end
 uOut = u(keep, :);
 yOut = y(keep, :);

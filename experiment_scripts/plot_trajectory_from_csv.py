@@ -19,8 +19,8 @@ REPO_ROOT = os.path.dirname(SCRIPT_DIR)
 DEFAULT_RAWDATA_DIR = os.path.join(
     REPO_ROOT, "data_folder", "April22_data_processing", "rawdata_all_data"
 )
-DEFAULT_CSV = os.path.join(DEFAULT_RAWDATA_DIR, "prop1650rudder1800_5.csv")
-PLOT_ALL_TRIALS = True  # True: load all CSVs in DEFAULT_RAWDATA_DIR when no CLI file/dir is given.
+DEFAULT_CSV_FILE = os.path.join(DEFAULT_RAWDATA_DIR, "invalid_prop1650rudder1800_1.csv")
+PLOT_ALL_TRIALS = False  # Plot all trials. True: load all CSVs in DEFAULT_RAWDATA_DIR when no CLI file/dir is given.
 
 
 def load_recording_csv(path: str) -> np.ndarray:
@@ -86,7 +86,13 @@ def _collect_paths(args: argparse.Namespace) -> list[str]:
         if not found:
             raise SystemExit(f"No files matched: {pattern}")
         return found
-    return [DEFAULT_CSV]
+    # No files/dir passed: use the default CSV file.
+    if not os.path.isfile(DEFAULT_CSV_FILE):
+        raise SystemExit(
+            f"Default CSV file not found: {DEFAULT_CSV_FILE}. "
+            "Pass file path(s) explicitly or use --dir."
+        )
+    return [DEFAULT_CSV_FILE]
 
 
 def main():
@@ -97,15 +103,16 @@ def main():
         "files",
         nargs="*",
         help=(
-            "CSV file path(s). If omitted, uses the default example under "
-            "data_folder/April22_data_processing/rawdata_all_data/ unless --dir is set."
+            "CSV file path(s). If omitted, uses "
+            "data_folder/April22_data_processing/rawdata_all_data/prop1625rudder2000_1.csv "
+            "unless --dir is set."
         ),
     )
     parser.add_argument(
         "--dir",
         type=str,
         default=None,
-        help=f"Directory of CSVs (default rawdata folder: {DEFAULT_RAWDATA_DIR})",
+        help=f"Directory of CSVs (default folder: {DEFAULT_RAWDATA_DIR})",
     )
     parser.add_argument(
         "--glob",

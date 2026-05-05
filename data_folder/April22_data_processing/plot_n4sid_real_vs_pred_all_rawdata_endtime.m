@@ -34,7 +34,10 @@ idCsvFiles = {
     'prop1650rudder1800_4.csv'
     'prop1675rudder1800_5.csv'
 
+    'prop1625rudder2000_2.csv'
+    'prop1650rudder2000_3.csv'
     'prop1675rudder2000_1.csv'
+
     };
 
 %% Optional tail trim on all loaded segments
@@ -78,6 +81,7 @@ circleMinSamples = 40;
 plotLineWidthTimeSeries = 6.8;
 plotLineWidthRealPred = 0.5 * plotLineWidthTimeSeries; % 25% thinner for real-vs-predicted speed/yaw traces
 plotLineWidthRealOnly = 0.5 * plotLineWidthRealPred; % real line is half the current real-vs-predicted width
+plotLineWidthInputOnly = 0.5 * plotLineWidthTimeSeries; % input traces are half the current width
 plotLineWidthLegendSwatches = 2.0; % Real/Predicted line icons in standalone legend only (thinner than plots)
 trajectoryAxisDisplaySpanM = 2; % X: x''=x_right−x; tick labels read 0..this (m) at left edge
 trajectoryYTickDisplayMinM = 0.5; % Y axis numbers only (world y stays data-snapped; else trajectory clips)
@@ -395,7 +399,7 @@ figPropThrust = figure('Name', sprintf('Prop thrust %%: %s', validationCsvFile),
 setFigureFullScreen(figPropThrust);
 ax3 = axes('Parent', figPropThrust);
 hold(ax3, 'on');
-hPropCmd = plot(ax3, tPlot, uPropPctVal, 'k-', 'LineWidth', 0.5 * plotLineWidthTimeSeries);
+hPropCmd = plot(ax3, tPlot, uPropPctVal, 'k-', 'LineWidth', plotLineWidthInputOnly);
 uistack(hPropCmd, 'top');
 xlabel(ax3, 'Time (s)');
 ylabel(ax3, 'Propeller Thrust (%)');
@@ -406,7 +410,7 @@ figPropAngle = figure('Name', sprintf('Prop angle: %s', validationCsvFile), 'Col
 setFigureFullScreen(figPropAngle);
 ax4 = axes('Parent', figPropAngle);
 hold(ax4, 'on');
-hRudCmd = plot(ax4, tPlot, uRudderDegVal, 'k-', 'LineWidth', 0.5 * plotLineWidthTimeSeries);
+hRudCmd = plot(ax4, tPlot, uRudderDegVal, 'k-', 'LineWidth', plotLineWidthInputOnly);
 uistack(hRudCmd, 'top');
 xlabel(ax4, 'Time (s)');
 ylabel(ax4, 'Propeller Angle (degrees)');
@@ -902,27 +906,39 @@ end
 end
 
 function [uOut, yOut, tOut] = cropSignalsToTime(u, y, t, cropEndTimeSec)
-if isempty(cropEndTimeSec)
-    uOut = u;
-    yOut = y;
-    tOut = t;
-    return;
+% End each segment when rudder command returns from turn (1800/2000 PWM) to
+% neutral (1500 PWM). If that transition is not found, optionally fall back
+% to the previous tail-trim behavior controlled by cropEndTimeSec.
+rudderPwm = u(:, 2);
+tolHigh = 15;
+tolNeutral = 15;
+isFromTurn = abs(rudderPwm(1:end-1) - 1800) <= tolHigh | abs(rudderPwm(1:end-1) - 2000) <= tolHigh;
+isToNeutral = abs(rudderPwm(2:end) - 1500) <= tolNeutral;
+transitionIdx = find(isFromTurn & isToNeutral, 1, 'first');
+
+if ~isempty(transitionIdx)
+    transitionTime = t(transitionIdx + 1);
+    cutoffTime = transitionTime - 0.25; % crop 0.25 s before return-to-neutral
+    keep = t <= cutoffTime;
+elseif isempty(cropEndTimeSec)
+    keep = true(size(t));
+else
+    if ~isfinite(cropEndTimeSec) || cropEndTimeSec <= 0
+        error('cropEndTimeSec must be a positive finite scalar or empty.');
+    end
+
+    tRel = t - t(1);
+    trialDurationSec = tRel(end);
+    if cropEndTimeSec >= trialDurationSec
+        error('cropEndTimeSec=%g is >= trial duration %g s.', cropEndTimeSec, trialDurationSec);
+    end
+
+    % Keep all samples up to (end - cropEndTimeSec): trim only tail portion.
+    keep = tRel <= (trialDurationSec - cropEndTimeSec);
 end
 
-if ~isfinite(cropEndTimeSec) || cropEndTimeSec <= 0
-    error('cropEndTimeSec must be a positive finite scalar or empty.');
-end
-
-tRel = t - t(1);
-trialDurationSec = tRel(end);
-if cropEndTimeSec >= trialDurationSec
-    error('cropEndTimeSec=%g is >= trial duration %g s.', cropEndTimeSec, trialDurationSec);
-end
-
-% Keep all samples up to (end - cropEndTimeSec): trim only tail portion.
-keep = tRel <= (trialDurationSec - cropEndTimeSec);
 if nnz(keep) < 20
-    error('Tail trim keeps too few samples (%d). Decrease cropEndTimeSec.', nnz(keep));
+    error('Trim keeps too few samples (%d).', nnz(keep));
 end
 
 uOut = u(keep, :);
